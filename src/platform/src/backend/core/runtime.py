@@ -33,6 +33,19 @@ def build_questions(payload, seed):
             q["field"] = field
         if media:
             q["media"] = {"kind": media["kind"], "path": media["url"]}
+        if candidates and any(c.get("media") for c in candidates):
+            # A repeated image/audio/video cannot serve as a distinct distractor.
+            correct_media = next(c for c in candidates if c["value"] in answers)
+            paths = {correct_media["media"]["path"]}
+            distinct_media = [correct_media]
+            for candidate in candidates:
+                path = candidate["media"]["path"]
+                if path not in paths:
+                    paths.add(path)
+                    distinct_media.append(candidate)
+            candidates = distinct_media
+            if len(candidates) < 4:
+                return
         if candidates:
             key = lambda value: tuple(
                 sorted(normalize(v) for v in value.split(";") if normalize(v))
@@ -118,7 +131,19 @@ def build_questions(payload, seed):
                     )
             assets = item.get("cellMedia", {}).get(field, [])
             for asset in sample_variants(assets):
-                if role != "answer-only" and name_role != "question-only":
+                ambiguous = any(
+                    other["id"] != item["id"]
+                    and any(
+                        a["url"] == asset["url"]
+                        for a in other.get("cellMedia", {}).get(field, [])
+                    )
+                    for other in items
+                )
+                if (
+                    role != "answer-only"
+                    and name_role != "question-only"
+                    and not ambiguous
+                ):
                     add(
                         item,
                         f"{asset['kind']}-to-name",
@@ -147,7 +172,12 @@ def build_questions(payload, seed):
                         )
     for item in items:
         for asset in sample_variants(item.get("media", [])):
-            if name_role != "question-only":
+            ambiguous = any(
+                other["id"] != item["id"]
+                and any(a["url"] == asset["url"] for a in other.get("media", []))
+                for other in items
+            )
+            if name_role != "question-only" and not ambiguous:
                 add(
                     item,
                     f"{asset['kind']}-to-name",

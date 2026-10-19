@@ -328,6 +328,26 @@ class QuestionBankTests(TestCase):
         self.payload["items"][0]["values"]["color"] = []
         self.assertFalse(any(q.get("field") == "color" for q in self.questions()))
 
+    def test_shared_media_is_not_an_ambiguous_question(self):
+        self.payload["items"][1]["cellMedia"]["photo"] = self.payload["items"][0][
+            "cellMedia"
+        ]["photo"]
+        qs = self.questions()
+        self.assertFalse(
+            any(
+                q.get("field") == "photo"
+                and q["direction"] == "image-to-name"
+                and q["objectId"] in ("0", "1")
+                for q in qs
+            )
+        )
+        self.assertFalse(
+            any(
+                q.get("field") == "photo" and q["direction"] == "name-to-image"
+                for q in qs
+            )
+        )
+
     def test_variants_are_one_relation(self):
         item = self.payload["items"][0]
         item["cellMedia"]["photo"].append({"kind": "image", "url": "/another.png"})

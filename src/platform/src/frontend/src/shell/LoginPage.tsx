@@ -21,7 +21,7 @@ export function LoginPage({ onSuccess }: { readonly onSuccess: (user: AuthUser) 
       const backend = await getBackend();
       const response = await backend.login(username.trim(), password);
       saveAuth(response.token, response.user);
-      resetBackend(); // 登录后重新探测（mock ↔ 真实后端）
+      resetBackend(); // Use the newly authenticated token on subsequent requests.
       onSuccess(response.user);
     } catch (cause) {
       if (cause instanceof ApiError && (cause.status === 400 || cause.status === 401)) {

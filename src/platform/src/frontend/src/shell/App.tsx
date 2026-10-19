@@ -23,7 +23,7 @@ export function App() {
   const [user, setUser] = useState<AuthUser | null>(() => (getToken() ? getStoredUser() : null));
   const [screen, setScreen] = useState<Screen>({ kind: "courses" });
   const [courses, setCourses] = useState<readonly CourseSummary[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<"error.loadFailed" | "activity.startError" | null>(null);
   const backendRef = useRef<BackendApi | null>(null);
   const openingRef = useRef(false);
   const [opening, setOpening] = useState(false);
@@ -61,8 +61,8 @@ export function App() {
       const list = await backend.listCourses();
       setCourses(list);
       setLoadError(null);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : String(error));
+    } catch {
+      setLoadError("error.loadFailed");
     }
   }, []);
 
@@ -87,7 +87,7 @@ export function App() {
       const activity = await enterCourse(backend, courseVersionId, mode, title);
       setLoadError(null);
       setScreen({kind: "activity", activity});
-    } catch { setLoadError(t("activity.startError")); }
+    } catch { setLoadError("activity.startError"); }
     finally { openingRef.current = false; setOpening(false); }
   };
   const closeActivity = (): void => {
@@ -136,7 +136,7 @@ export function App() {
         <div className="host-error" role="alert">
           <div>
             <h1>{t("error.loadFailed")}</h1>
-            <p>{loadError}</p>
+            <p>{t(loadError)}</p>
             <button className="gold-button" onClick={() => void refreshCourses()}>{t("error.retry")}</button>
           </div>
         </div>

@@ -87,7 +87,7 @@ class AnvilTests(TestCase):
         self.assertEqual(result['questions'][0]['interaction']['stimulus'],result['questions'][1]['interaction']['stimulus'])
 
     def test_demo_zip_compiles_real_workbook_and_assets(self):
-        archive=Path(__file__).resolve().parents[5]/'src/anvil/templates/anvil-demo.zip'
+        archive=Path(__file__).resolve().parent/'fixtures/anvil-demo.zip'
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
             with zipfile.ZipFile(archive) as package:package.extractall(root)

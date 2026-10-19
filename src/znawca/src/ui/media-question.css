@@ -1,0 +1,23 @@
+.question-media {
+  display: grid;
+  width: 100%;
+  margin: -20px 0 28px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(209, 175, 89, 0.48);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.question-media img,
+.question-media video {
+  display: block;
+  max-width: 100%;
+  /* 6.8：随视口高度伸缩，小窗不超过原 360px 量级，大屏可长至 560px */
+  max-height: min(48vh, 560px);
+  object-fit: contain;
+}
+
+.question-media audio {
+  width: min(560px, calc(100% - 32px));
+  margin: 28px 16px;
+}

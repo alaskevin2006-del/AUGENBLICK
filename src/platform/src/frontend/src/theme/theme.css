@@ -1,0 +1,131 @@
+/* 契约§六：Znawca 天鹅绒绿+金主题（变量与桌面 app-shell.css 一致）。 */
+:root {
+  font-family: Candara, "Segoe UI", sans-serif;
+  color: #eee9d7;
+  background: #071a13;
+  font-synthesis: none;
+  --velvet: #123b2b;
+  --deep: #071a13;
+  --gold: #c6a24b;
+  --pale-gold: #f0d990;
+  --metal: #546158;
+  --line: rgba(209, 175, 89, 0.48);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; min-width: 960px; overflow: hidden; /* 固定窗口：整页不滚动，内容区各自内滚 */ }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+
+/* 壳层固定窗口（覆盖引擎 app-shell.css 的 min-height 链，body 前缀提权） */
+body .app-shell { height: 100vh; min-height: 0; display: flex; flex-direction: column; }
+body .app-shell .title-bar { flex: 0 0 auto; }
+body .app-shell .workspace { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body .app-shell .workspace .content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Activity Host 外框 */
+.host-shell {
+  height: 100vh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 80% 0, rgba(198, 162, 75, 0.16), transparent 28%),
+    repeating-linear-gradient(105deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 4px),
+    linear-gradient(145deg, #123b2b, #061711 70%);
+}
+.host-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+/* 引擎根：仅水平居中（flex 滚动容器里垂直 margin:auto 会裁顶） */
+.host-content > .session-page { margin: 0 auto; flex: 1 0 auto; }
+.host-title { color: var(--pale-gold); font: 600 1.05rem/1 "Palatino Linotype", Georgia, serif; }
+
+/* 退出确认 / 错误弹窗 */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 12, 8, 0.72);
+  z-index: 40;
+}
+.host-dialog {
+  max-width: 460px;
+  padding: 34px 38px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, #17422f, #071d14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.host-dialog h1 { margin: 0 0 12px; color: #fff7dd; font: 600 1.6rem/1.1 "Palatino Linotype", Georgia, serif; }
+.host-dialog p { margin: 0 0 22px; color: #cbd3ca; }
+.host-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: 12px; }
+
+/* E_TECH 错误界面 */
+.host-error {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  text-align: center;
+}
+.host-error h1 { color: #fff7dd; font: 600 2rem/1.1 "Palatino Linotype", Georgia, serif; }
+.host-error p { color: #cbd3ca; margin-bottom: 22px; }
+
+/* 全局顶栏（TopBar）：左侧品牌+活动标题，右侧操作区 */
+.topbar-side { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.topbar-side .brand { font-size: 1.25rem; }
+.topbar-side .brand-mark { width: 36px; height: 36px; font-size: 1.35rem; }
+.topbar-side .host-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-select {
+  padding: 8px 10px;
+  border: 1px solid #617067;
+  color: #f8f3df;
+  background: #0a251a;
+}
+.topbar-user { color: var(--pale-gold); font-weight: 600; }
+
+/* 登录页 */
+.login-page { display: grid; place-items: center; }
+.login-card {
+  width: min(440px, 90vw);
+  padding: 40px 44px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, #17422f, #071d14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.login-card .brand { font-size: 1.3rem; margin-bottom: 26px; }
+.login-card .brand-mark { width: 38px; height: 38px; font-size: 1.45rem; }
+.login-card h1 { margin: 0 0 8px; color: #fff7dd; font: 600 1.8rem/1.1 "Palatino Linotype", Georgia, serif; }
+.login-card > p { margin: 0 0 24px; color: #cbd3ca; }
+.login-card form { display: flex; flex-direction: column; gap: 16px; }
+.login-card label { display: flex; flex-direction: column; gap: 6px; color: #cbd3ca; }
+.login-card input {
+  padding: 11px 12px;
+  border: 1px solid #617067;
+  color: #f8f3df;
+  background: #0a251a;
+}
+.login-card input:focus { outline: 2px solid rgba(198, 162, 75, 0.55); outline-offset: 1px; }
+.login-card .gold-button { margin-top: 6px; }
+.login-error { margin: 0; color: #e8a68c; }
+
+/* 开发者页 */
+.page-dev { max-width: 1100px; margin: 0 auto; }
+.dev-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+.dev-table th, .dev-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(209, 175, 89, 0.22);
+  text-align: start;
+}
+.dev-table th { color: var(--gold); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.dev-table td { color: #eee9d7; }
+.upload-panel { padding: 26px 30px; border: 1px solid var(--line); background: rgba(9, 32, 23, 0.6); }
+.upload-panel h2 { margin: 0 0 16px; color: #fff7dd; font: 600 1.4rem/1.1 "Palatino Linotype", Georgia, serif; }
+.upload-form { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.upload-form input[type="file"] { color: #cbd3ca; }
+.upload-result { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.upload-result strong { color: var(--pale-gold); }
+.upload-result ul { margin: 0; padding-inline-start: 22px; color: #cbd3ca; }
+.upload-result em { color: var(--gold); font-style: normal; }
+.upload-failure strong { color: #e8a68c; }
+.upload-failure p { margin: 0; color: #cbd3ca; }
+.warning-list li { color: #e8cf9a; }

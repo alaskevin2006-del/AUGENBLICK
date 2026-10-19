@@ -1,0 +1,28 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+out/
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 环境与密钥
+.env
+.env.*
+*.local
+
+# Local runtime data and agent state (never publish)
+.workbuddy/
+.venv/
+.worktrees/
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.sqlite3-*
+*.tsbuildinfo
+src/platform/src/backend/media/
+src/platform/tests/shots/
+!*.env.example

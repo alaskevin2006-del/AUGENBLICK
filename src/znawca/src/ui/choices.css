@@ -1,0 +1,153 @@
+.choice-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* D-11/D-25：纯图片/音频/视频选项固定 2×2。4 项为两列两行；3 项仍为两列，
+   最后一项单独占位且不跨列拉伸（grid 自动排列，不改 DOM/数据顺序）。
+   文字选择题不使用本规则。 */
+.choice-list.media-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 选项区媒体在 2×2 网格内自适应：高度随窗口高度伸缩（clamp），
+   下限 80px 保证最小常规窗口（960×640）两行同时可见（D-11），
+   上限 200px 避免超大显示器下过度拉伸；水平居中避免单侧留黑。 */
+.choice-list.media-grid .question-media img {
+  max-height: clamp(80px, 18vh, 200px);
+  margin: 0 auto;
+}
+
+.choice-list.media-grid label {
+  padding: 8px 12px;
+}
+
+.choice-list.media-grid .question-media audio {
+  margin: 4px 12px;
+}
+
+/* D-25：视频选项在 2×2 网格内自适应，与图片同等约束 */
+.choice-list.media-grid .question-media video {
+  max-height: clamp(80px, 18vh, 200px);
+  margin: 0 auto;
+}
+
+/* 6.8：高窗口（视口 ≥900px，如 1080p 最大化）放宽选项图上限，
+   随视口继续长高；上方基础规则不变，继续覆盖 960×640 最小窗口（D-11）。 */
+@media (min-height: 900px) {
+  .choice-list.media-grid .question-media img,
+  .choice-list.media-grid .question-media video {
+    max-height: clamp(120px, 24vh, 340px);
+  }
+}
+
+/* 6.8：宽窗口下 2×2 网格保持紧凑居中，避免两列被拉散、图片间距过大 */
+.choice-list.media-grid {
+  max-width: min(1100px, 100%);
+  margin-inline: auto;
+}
+
+.choice-list legend {
+  margin-bottom: 9px;
+  color: #aebbb2;
+  font-size: 0.72rem;
+}
+
+.choice-list label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid #617067;
+  color: #f8f3df;
+  background: #0a251a;
+  cursor: pointer;
+}
+
+.choice-list input {
+  accent-color: #c6a24b;
+}
+
+.choice-list label:has(.question-media) {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.choice-list .question-media {
+  margin: 0;
+}
+
+/* D-22：问题行与文字答案按钮的手动扬声器按钮。只触发播放，
+   不参与选中/提交（type="button" + 事件不冒泡）。 */
+.question-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.question-heading h1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.speech-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  border: 1px solid #617067;
+  border-radius: 8px;
+  color: #e9d99f;
+  background: #0a251a;
+  cursor: pointer;
+}
+
+.speech-button:hover {
+  border-color: #c6a24b;
+  color: #f8f3df;
+}
+
+.choice-list .speech-button {
+  margin-left: auto;
+}
+
+/* D-24：Testing 头部的进度单位三值（已完成 / 总数 · 剩余）。 */
+.unit-progress {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #e9d99f;
+  opacity: 0.9;
+}
+
+
+.result-stats {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 0 0 24px;
+  color: #e9d99f;
+}
+
+.answer-review {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.answer-review article,
+.answer-review > div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid rgba(209, 175, 89, 0.35);
+  background: rgba(0, 0, 0, 0.18);
+}

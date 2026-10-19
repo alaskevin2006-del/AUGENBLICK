@@ -10,7 +10,7 @@ export function CourseListPage({
   readonly courses: readonly CourseSummary[];
   readonly disabled?: boolean;
   readonly view: "courses" | "my-courses";
-  readonly onEnter: (id: string, mode: "L" | "T") => void;
+  readonly onEnter: (id: string) => void;
   readonly onEnroll: (id: string) => void;
 }) {
   const t = useT();
@@ -42,22 +42,7 @@ export function CourseListPage({
                         )}
                       </button>
                     ) : (
-                      <>
-                        <button
-                          className="metal-button"
-                          disabled={disabled || course.engine !== "znawca"}
-                          onClick={() => onEnter(course.courseVersionId, "L")}
-                        >
-                          {t("courses.learn")}
-                        </button>
-                        <button
-                          className="metal-button"
-                          disabled={disabled || course.engine !== "znawca"}
-                          onClick={() => onEnter(course.courseVersionId, "T")}
-                        >
-                          {t("courses.test")}
-                        </button>
-                      </>
+                      <button className="metal-button" disabled={disabled || course.engine !== "znawca"} onClick={() => onEnter(course.courseVersionId)}>{t("courses.enter")}</button>
                     )}
                   </div>
                 </div>

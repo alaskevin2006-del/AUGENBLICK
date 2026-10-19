@@ -13,7 +13,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import CourseVersion, Enrollment, Event, Session, Submission
-from .runtime import build_questions, initial_state, public_question, snapshot
+from .runtime import initial_state, public_question, snapshot
+from .selection import select_questions
 from .scoring import evaluate
 
 
@@ -36,7 +37,10 @@ class AuthenticatedView(APIView):
 def owned(request, session_id, lock=False):
     qs = Session.objects.select_related("course_version").filter(user=request.user)
     if lock:
-        qs = qs.select_for_update()
+        # Course first, then session, matching creation and publication lock order.
+        course_id = get_object_or_404(qs, pk=session_id).course_version_id
+        CourseVersion.objects.select_for_update().get(pk=course_id)
+        qs = qs.select_for_update(of=("self",))
     session = get_object_or_404(qs, pk=session_id)
     if session.is_preview:
         if not request.user.is_staff:
@@ -139,7 +143,9 @@ class SessionListView(AuthenticatedView):
             if preview
             else CourseVersion.objects.filter(status="published")
         )
-        course = get_object_or_404(available, pk=request.data.get("courseVersionId"))
+        course = get_object_or_404(
+            available.select_for_update(), pk=request.data.get("courseVersionId")
+        )
         if (
             not preview
             and not Enrollment.objects.filter(
@@ -157,11 +163,11 @@ class SessionListView(AuthenticatedView):
         )
         if mode == "T" and not preview and sessions.filter(status="finished").exists():
             raise Conflict("This test has already been submitted.")
-        count = request.data.get("itemCount")
+        count = request.data.get("itemCount", 10)
         if count is not None and (type(count) is not int or count < 1 or count > 1000):
             raise ValidationError("itemCount must be an integer from 1 to 1000.")
         seed = random.SystemRandom().randint(0, 2**31 - 1)
-        questions = build_questions(course.payload, seed)
+        questions, _, selection = select_questions(course.payload, request.data, seed)
         if not questions:
             raise ValidationError("This course has no usable questions.")
         questions = questions[:count] if count is not None else questions
@@ -174,7 +180,10 @@ class SessionListView(AuthenticatedView):
             course_version=course,
             mode=mode,
             random_seed=seed,
-            runtime=initial_state(questions),
+            runtime={
+                **initial_state(questions),
+                "selection": {**selection, "itemCount": count},
+            },
             is_preview=preview,
         )
         record(

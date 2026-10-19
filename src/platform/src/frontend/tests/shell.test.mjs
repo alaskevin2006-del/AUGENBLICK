@@ -12,7 +12,7 @@ before(async () => {
   const outfile = path.join(temp, "shell.mjs");
   await build({
     stdin: {
-      contents: `export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
+      contents: `export {CourseSetupPage} from './src/shell/CourseSetupPage'; export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
       resolveDir: process.cwd(),
       loader: "ts",
     },
@@ -73,7 +73,7 @@ test("developer navigation never exposes student catalogs; five languages availa
   );
   view.unmount();
 });
-test("catalog joins; owned library exposes learning and testing only", async () => {
+test("catalog joins; owned library exposes single course entry", async () => {
   let view;
   let joined;
   await act(async () => {
@@ -99,8 +99,8 @@ test("catalog joins; owned library exposes learning and testing only", async () 
       }),
     ),
   );
-  assert.ok(button(view, "Learn"));
-  assert.ok(button(view, "Test"));
+  assert.ok(button(view, "Enter course"));
+  assert.equal(button(view, "Learn"), undefined);
   assert.equal(button(view, "Add to my courses"), undefined);
   view.unmount();
 });
@@ -199,7 +199,7 @@ test("developer upload failure retains selected file for retry and success refre
   assert.ok(JSON.stringify(view.toJSON()).includes("New course"));
   view.unmount();
 });
-test("developer draft actions preview each mode and publish, published row cannot publish again", async () => {
+test("developer has unified course entry and publish; published row has unpublish", async () => {
   let actions = [];
   let view;
   await act(async () => {
@@ -214,13 +214,11 @@ test("developer draft actions preview each mode and publish, published row canno
     );
   });
   act(() => {
-    button(view, "Preview · Learn").props.onClick();
-    button(view, "Preview · Test").props.onClick();
+    button(view, "Enter course").props.onClick();
     button(view, "Publish").props.onClick();
   });
   assert.deepEqual(actions, [
-    ["c1", "L"],
-    ["c1", "T"],
+    ["c1", undefined],
     ["c1", "publish"],
   ]);
   await act(async () =>
@@ -238,7 +236,7 @@ test("developer draft actions preview each mode and publish, published row canno
   view.unmount();
 });
 
-test("delayed staff identity and preview responses cannot cross logout and student login", async () => {
+test("delayed staff identity and setup responses cannot cross logout and student login", async () => {
   const storage = new Map();
   globalThis.localStorage = {
     getItem: (key) => storage.get(key) ?? null,
@@ -268,7 +266,7 @@ test("delayed staff identity and preview responses cannot cross logout and stude
       releaseMe = resolve;
     });
   backend.listDeveloperCourses = async () => [course];
-  backend.createSession = () =>
+  backend.courseSetup = () =>
     new Promise((resolve) => {
       releaseSession = resolve;
     });
@@ -291,7 +289,7 @@ test("delayed staff identity and preview responses cannot cross logout and stude
   );
   await act(async () => {
     releaseMe(staff);
-    releaseSession({ sessionId: "old-preview", mode: "L", isPreview: true });
+    releaseSession({course, availableQuestionCount: 30, availableObjectCount: 5, kinds: [], directions: [], filters: [], testSubmitted: false});
   });
   assert.equal(view.root.findAllByType(mod.ActivityHost).length, 0);
   assert.equal(view.root.findAllByType(mod.DeveloperPage).length, 0);
@@ -382,4 +380,82 @@ test("API routes publish, enrollment and developer preview explicitly", async ()
     ],
   );
   assert.equal(JSON.parse(calls[4].body).preview, true);
+});
+
+const setup = {course, availableQuestionCount: 30, availableObjectCount: 5, kinds: [{value:"input",count:15},{value:"choice",count:15}], directions: [{value:"name-to-property",count:30}], filters: [{field:"Group",values:["A","B"]}], testSubmitted:false};
+test("shared setup defaults to ten; all sends null; options and quantity are forwarded", async () => {
+  mod.setLocale("en"); mod.resetBackend();
+  const backend = await mod.getBackend();
+  const requests = []; const starts = [];
+  backend.courseSetup = async (id, config) => {requests.push(config); return {...setup, availableQuestionCount: config.kinds?.length === 0 ? 0 : 30};};
+  let view;
+  await act(async () => {view = Renderer.create(React.createElement(mod.CourseSetupPage,{id:"c1", onBack:()=>{}, onStart:(...args)=>starts.push(args)}));});
+  assert.equal(view.root.findByProps({type:"number"}).props.value,"10");
+  assert.ok(JSON.stringify(view.toJSON()).includes("Name to property"));
+  act(()=>button(view,"Start").props.onClick());
+  assert.equal(starts[0][2].itemCount,10);
+  act(()=>view.root.findByProps({type:"number"}).props.onChange({target:{value:"3"}}));
+  const checks = view.root.findAllByProps({type:"checkbox"});
+  await act(async()=>checks[0].props.onChange());
+  assert.deepEqual(requests.at(-1).kinds,["choice"]);
+  act(()=>button(view,"Start").props.onClick());
+  assert.deepEqual(starts[1][2],{kinds:["choice"],itemCount:3});
+  act(()=>view.root.findAllByProps({name:"scope"})[1].props.onChange());
+  act(()=>button(view,"Start").props.onClick());
+  assert.equal(starts[2][2].itemCount,null);
+  await act(async()=>view.root.findAllByProps({type:"checkbox"})[1].props.onChange());
+  assert.equal(button(view,"Start").props.disabled,true);
+  assert.equal(view.root.findAllByType("fieldset")[2].props.disabled,false);
+  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
+  assert.equal(button(view,"Start").props.disabled,false);
+  view.unmount();
+});
+test("saved setup keeps complete choices, handles failure, caps batch, translates all five locales", async()=>{
+  mod.resetBackend(); const backend=await mod.getBackend();
+  backend.courseSetup=async (_id,c)=>{if(c.kinds?.length===0)throw Error("invalid");return {...setup, availableQuestionCount:2000, directions:c.filters?.length?[]:setup.directions};};
+  let view;
+  await act(async()=>{view=Renderer.create(React.createElement(mod.CourseSetupPage,{id:"c1",initial:{config:{filters:[{field:"Group",values:["A"]}]},mode:"L",all:false,quantity:"5"},onStart:()=>{},onBack:()=>{}}));});
+  assert.equal(view.root.findByProps({type:"number"}).props.max,1000);
+  assert.ok(JSON.stringify(view.toJSON()).includes("Name to property"));
+  for(const [locale,label] of [["zh-CN","名称 → 属性"],["pl","Nazwa → właściwość"],["ru","Название → свойство"],["ar","الاسم ← الخاصية"],["en","Name to property"]]){
+    await act(async()=>mod.setLocale(locale));
+    assert.ok(JSON.stringify(view.toJSON()).includes(label));
+  }
+  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"})[1].props.onChange());
+  assert.equal(button(view,"Start").props.disabled,true);
+  assert.equal(view.root.findAllByType("fieldset")[2].props.disabled,false);
+  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
+  assert.equal(button(view,"Start").props.disabled,false);
+  view.unmount();
+});
+test("unpublish can be cancelled and only confirmed action calls server",async()=>{
+  let calls=[]; let view;
+  await act(async()=>{view=Renderer.create(React.createElement(mod.DeveloperPage,{isDeveloper:true,courses:[{...course,status:"published"}],onUploaded:()=>{},onPreview:()=>{},onPublish:()=>{},onUnpublish:id=>calls.push(id)}));});
+  act(()=>button(view,"Unpublish").props.onClick());
+  assert.equal(view.root.findAllByProps({role:"dialog"}).length,1);
+  act(()=>button(view,"Cancel").props.onClick()); assert.deepEqual(calls,[]);
+  act(()=>button(view,"Unpublish").props.onClick());
+  act(()=>view.root.findByProps({role:"dialog"}).findAllByType("button")[1].props.onClick());
+  assert.deepEqual(calls,["c1"]);view.unmount();
+});
+
+test("refresh of encoded course deep link shows identical setup for either account role",async()=>{
+  const snapshots=[];
+  for(const isDeveloper of [true,false]){
+    const user={username:isDeveloper?'admin':'learner',isDeveloper};
+    mod.saveAuth('token-'+user.username,user);mod.resetBackend();
+    const backend=await mod.getBackend();backend.me=async()=>user;
+    backend.listDeveloperCourses=backend.listCourses=async()=>[course];
+    backend.courseSetup=async id=>{assert.equal(id,'pl@1');return setup;};
+    window.location.hash='#/course/pl%401';let view;
+    await act(async()=>{view=Renderer.create(React.createElement(mod.App));});
+    assert.equal(window.location.hash,'#/course/pl%401');
+    const page=view.root.findByType(mod.CourseSetupPage);
+    snapshots.push(JSON.stringify(page.findByProps({className:'workspace'}).findAllByType('section').map(n=>n.props.className)));
+    assert.ok(button(view,'Start'));
+    assert.equal(button(view,'Preview · Learn'),undefined);
+    view.unmount();
+  }
+  assert.equal(snapshots[0],snapshots[1]);
 });

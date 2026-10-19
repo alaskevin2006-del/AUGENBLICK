@@ -1,5 +1,6 @@
 """Course publication and explicit learner enrollment."""
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -66,8 +67,61 @@ class EnrollCourseView(AuthenticatedView):
     def post(self, request, course_version_id):
         if request.user.is_staff:
             raise PermissionDenied("Developers use preview instead of enrollment.")
+        # Match session creation: owner then course, including FK insert locks.
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
         course = get_object_or_404(
-            CourseVersion.objects.filter(status="published"), pk=course_version_id
+            CourseVersion.objects.select_for_update().filter(status="published"),
+            pk=course_version_id,
         )
         Enrollment.objects.get_or_create(user=request.user, course_version=course)
         return Response(course_summary(course, True))
+
+
+class UnpublishCourseView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, course_version_id):
+        if not request.user.is_staff:
+            raise PermissionDenied("Developer access required.")
+        course = get_object_or_404(
+            CourseVersion.objects.select_for_update(), pk=course_version_id
+        )
+        if course.status != "draft" or course.published_at is not None:
+            course.status = "draft"
+            course.published_at = None
+            course.save(update_fields=["status", "published_at"])
+        return Response(course_summary(course))
+
+
+class CourseSetupView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, course_version_id):
+        from rest_framework.exceptions import ValidationError
+        from .selection import select_questions
+        from .models import Session
+
+        available = CourseVersion.objects.select_for_update()
+        if not request.user.is_staff:
+            available = available.filter(status="published")
+        course = get_object_or_404(available, pk=course_version_id)
+        enrolled = Enrollment.objects.filter(
+            user=request.user, course_version=course
+        ).exists()
+        if not request.user.is_staff and not enrolled:
+            raise PermissionDenied("Join this course before learning.")
+        if course.engine != "znawca":
+            raise ValidationError("This engine is not available yet.")
+        _, metadata, _ = select_questions(course.payload, request.data)
+        return Response(
+            {
+                "course": course_summary(course, enrolled),
+                **metadata,
+                "testSubmitted": not request.user.is_staff
+                and Session.objects.filter(
+                    user=request.user,
+                    course_version=course,
+                    mode="T",
+                    is_preview=False,
+                    status="finished",
+                ).exists(),
+            }
+        )

@@ -15,16 +15,19 @@ export function DeveloperPage({
   onUploaded,
   onPreview,
   onPublish,
+  onUnpublish,
 }: {
   readonly isDeveloper: boolean;
   readonly courses: readonly CourseSummary[];
   readonly disabled?: boolean;
   readonly onUploaded: () => Promise<void> | void;
-  readonly onPreview: (id: string, mode: "L" | "T") => void;
+  readonly onPreview: (id: string) => void;
+  readonly onUnpublish: (id: string) => void;
   readonly onPublish: (id: string) => void;
 }) {
   const t = useT();
   const lock = useRef(false);
+  const [withdraw, setWithdraw] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -185,24 +188,8 @@ export function DeveloperPage({
                     </td>
                     <td>
                       <div className="course-actions">
-                        <button
-                          className="metal-button"
-                          disabled={
-                            busy || disabled || course.engine !== "znawca"
-                          }
-                          onClick={() => onPreview(course.courseVersionId, "L")}
-                        >
-                          {t("dev.previewL")}
-                        </button>
-                        <button
-                          className="metal-button"
-                          disabled={
-                            busy || disabled || course.engine !== "znawca"
-                          }
-                          onClick={() => onPreview(course.courseVersionId, "T")}
-                        >
-                          {t("dev.previewT")}
-                        </button>
+                        <button className="metal-button" disabled={busy || disabled || course.engine !== "znawca"} onClick={() => onPreview(course.courseVersionId)}>{t("courses.enter")}</button>
+                        {course.status === "published" && <button className="metal-button" disabled={busy || disabled} onClick={() => setWithdraw(course.courseVersionId)}>{t("dev.unpublish")}</button>}
                         {course.status !== "published" && (
                           <button
                             className="gold-button"
@@ -220,6 +207,7 @@ export function DeveloperPage({
             </table>
           </div>
           {courses.length === 0 && <p>{t("courses.empty")}</p>}
+          {withdraw && <div className="dialog-backdrop"><section className="host-dialog" role="dialog" aria-modal="true" aria-label={t("dev.unpublish")}><h2 dir="auto">{courses.find(c => c.courseVersionId === withdraw)?.title}</h2><p>{t("dev.unpublishConfirm")}</p><div className="course-actions"><button className="metal-button" onClick={() => setWithdraw(null)}>{t("setup.cancel")}</button><button className="gold-button" disabled={busy || disabled} onClick={() => {onUnpublish(withdraw); setWithdraw(null);}}>{t("dev.unpublish")}</button></div></section></div>}
           <p className="page-note">{t("dev.note")}</p>
         </div>
       </section>

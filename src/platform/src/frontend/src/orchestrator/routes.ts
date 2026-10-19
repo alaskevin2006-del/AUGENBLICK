@@ -7,3 +7,8 @@ export function roleRoute(
   if (user.isDeveloper) return "developer";
   return hash === "#/my-courses" ? "my-courses" : "courses";
 }
+
+export function courseRoute(hash: string): string | null {
+ if (!hash.startsWith("#/course/")) return null;
+ try { return decodeURIComponent(hash.slice(9)) || null; } catch { return null; }
+}

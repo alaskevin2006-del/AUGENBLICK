@@ -1,5 +1,5 @@
 import type { RuntimeSnapshot } from "@znawca/adapter/runtime";
-import type { BackendApi } from "./types";
+import type { BackendApi, CreateSessionRequest } from "./types";
 export interface ActiveActivity {
   readonly sessionId: string;
   readonly courseTitle: string;
@@ -13,8 +13,10 @@ export async function enterCourse(
   mode: "L" | "T",
   courseTitle: string,
   preview = false,
+  config: Omit<CreateSessionRequest, "courseVersionId" | "mode" | "preview"> = {},
 ): Promise<ActiveActivity> {
   const snapshot = await backend.createSession({
+    ...config,
     courseVersionId,
     mode,
     ...(preview ? { preview: true } : {}),

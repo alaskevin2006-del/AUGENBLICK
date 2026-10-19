@@ -7,14 +7,16 @@ import {
 } from "../orchestrator/api";
 import { clearAuth, getStoredUser, getToken } from "../orchestrator/auth";
 import { enterCourse, type ActiveActivity } from "../orchestrator/session";
-import { roleRoute, type PageRoute } from "../orchestrator/routes";
+import { roleRoute, courseRoute, type PageRoute } from "../orchestrator/routes";
 import {
   ApiError,
   type AuthUser,
   type BackendApi,
   type CourseSummary,
+  type CreateSessionRequest,
 } from "../orchestrator/types";
 import { ActivityHost } from "../host/ActivityHost";
+import { CourseSetupPage, type SetupPreferences } from "./CourseSetupPage";
 import { CourseListPage } from "./CourseListPage";
 import { LoginPage } from "./LoginPage";
 import { DeveloperPage } from "./DeveloperPage";
@@ -34,6 +36,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const backendRef = useRef<BackendApi | null>(null);
   const lock = useRef(false);
+  const setupPreferences = useRef<Record<string, SetupPreferences>>({});
   const generation = useRef(0);
   const identity = useRef(0);
   const navigation = useRef(0);
@@ -47,6 +50,7 @@ export function App() {
   };
   const routedHash = useRef(hash);
   routedHash.current = hash;
+  const courseId = courseRoute(hash);
   const route = user ? roleRoute(user, hash) : "courses";
   useEffect(() => {
     document.documentElement.dir = textDirection(locale);
@@ -83,6 +87,7 @@ export function App() {
     clearAuth();
     resetBackend();
     backendRef.current = null;
+    setupPreferences.current = {};
     setUser(null);
     setCourses([]);
     setActivity(null);
@@ -112,11 +117,11 @@ export function App() {
       .catch(() => undefined);
   }, [user?.username]);
   useEffect(() => {
-    if (user && hash !== `#/${route}`) {
+    if (user && !courseId && hash !== `#/${route}`) {
       window.history.replaceState(null, "", `#/${route}`);
       setHash(`#/${route}`);
     }
-  }, [user, hash, route]);
+  }, [user, hash, route, courseId]);
   const refresh = useCallback(async () => {
     if (!user || currentUser.current?.username !== user.username) return;
     const epoch = identity.current;
@@ -177,20 +182,24 @@ export function App() {
       }
     }
   };
-  const open = (id: string, mode: "L" | "T") =>
+  const openSetup = (id: string) => {
+    invalidateNavigation(); setActivity(null); setFailure(null);
+    const target = `#/course/${encodeURIComponent(id)}`;
+    routedHash.current = target; window.location.hash = target; setHash(target);
+  };
+  const open = (id: string, mode: "L" | "T", title: string, config: Omit<CreateSessionRequest, "courseVersionId" | "mode" | "preview">) =>
     void action(
       async (isCurrent) => {
         const backend = backendRef.current ?? (await getBackend());
         if (!isCurrent()) return;
         backendRef.current = backend;
-        const title =
-          courses.find((course) => course.courseVersionId === id)?.title ?? "";
         const opened = await enterCourse(
           backend,
           id,
           mode,
           title,
           Boolean(user?.isDeveloper),
+          config,
         );
         if (isCurrent()) setActivity(opened);
       },
@@ -203,8 +212,7 @@ export function App() {
           : "activity.startError",
     );
   const close = () => {
-    navigate(user?.isDeveloper ? "developer" : "my-courses");
-    void refresh();
+    invalidateNavigation(); setActivity(null); setFailure(null);
   };
   if (!user)
     return (
@@ -225,7 +233,7 @@ export function App() {
   if (activity)
     return (
       <ActivityHost
-        title={`${activity.snapshot.isPreview ? t("activity.preview") + " · " : ""}${activity.courseTitle} · ${t(activity.mode === "L" ? "courses.learn" : "courses.test")}`}
+        title={`${activity.courseTitle} · ${t(activity.mode === "L" ? "courses.learn" : "courses.test")}`}
         user={user}
         onNavigate={navigate}
         onLogout={logout}
@@ -265,18 +273,24 @@ export function App() {
           </button>
         </div>
       )}
-      {loading && (
+      {loading && !courseId && (
         <p className="page-loading" role="status">
           {t("page.loading")}
         </p>
       )}
-      {route === "developer" ? (
+      {courseId ? <CourseSetupPage key={`${user.username}:${courseId}`} id={courseId} initial={setupPreferences.current[courseId]} onPreferences={value => {setupPreferences.current[courseId] = value;}} disabled={busy} onBack={() => navigate(user.isDeveloper ? "developer" : "my-courses")} onStart={(mode, title, config) => open(courseId, mode, title, config)}/> : route === "developer" ? (
         <DeveloperPage
           isDeveloper={user.isDeveloper}
           courses={courses}
           disabled={busy || loading}
           onUploaded={refresh}
-          onPreview={open}
+          onPreview={openSetup}
+          onUnpublish={(id) => void action(async (isCurrent) => {
+            const backend = backendRef.current ?? (await getBackend());
+            if (!isCurrent()) return;
+            await backend.unpublishCourse(id);
+            if (isCurrent()) await refresh();
+          })}
           onPublish={(id) =>
             void action(async (isCurrent) => {
               const backend = backendRef.current ?? (await getBackend());
@@ -291,7 +305,7 @@ export function App() {
           view={route}
           courses={courses}
           disabled={busy || loading}
-          onEnter={open}
+          onEnter={openSetup}
           onEnroll={(id) =>
             void action(async (isCurrent) => {
               const backend = backendRef.current ?? (await getBackend());

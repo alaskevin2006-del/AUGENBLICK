@@ -14,6 +14,14 @@ urlpatterns = [
         "dev/courses/<str:course_version_id>/publish/",
         catalog_views.PublishCourseView.as_view(),
     ),
+    path(
+        "dev/courses/<str:course_version_id>/unpublish/",
+        catalog_views.UnpublishCourseView.as_view(),
+    ),
+    path(
+        "courses/<str:course_version_id>/setup/",
+        catalog_views.CourseSetupView.as_view(),
+    ),
     path("my-courses/", catalog_views.MyCoursesView.as_view()),
     path(
         "courses/<str:course_version_id>/enroll/",

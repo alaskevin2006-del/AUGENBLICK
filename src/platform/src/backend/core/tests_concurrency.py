@@ -74,9 +74,13 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
                     cursor.execute("SET statement_timeout = '15s'")
                     cursor.execute("SET lock_timeout = '10s'")
                 client = APIClient()
-                client.force_authenticate(get_user_model().objects.get(pk=user_id))
+                client.force_authenticate(
+                    get_user_model().objects.get(
+                        pk=request[2] if len(request) > 2 else user_id
+                    )
+                )
                 barrier.wait(timeout=10)
-                url, payload = request
+                url, payload = request[:2]
                 response = client.post(url, payload, format="json")
                 return response.status_code, response.data
             finally:
@@ -202,4 +206,46 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
                 "/api/sessions/", self.start_payload, format="json"
             ).status_code,
             409,
+        )
+
+    def test_unpublish_racing_start_preserves_consistent_access(self):
+        author = get_user_model().objects.create_user(
+            "concurrent-author", is_staff=True
+        )
+        start, unpublish = self.race(
+            ("/api/sessions/", self.start_payload),
+            (f"/api/dev/courses/{self.course.pk}/unpublish/", {}, author.pk),
+        )
+        self.assertEqual(unpublish[0], 200, unpublish)
+        self.assertIn(start[0], (201, 404), start)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.status, "draft")
+        self.assertEqual(
+            Enrollment.objects.filter(course_version=self.course).count(), 1
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/sessions/", self.start_payload, format="json"
+            ).status_code,
+            404,
+        )
+        if start[0] == 201:
+            self.assertEqual(
+                self.client.get(f"/api/sessions/{start[1]['sessionId']}/").status_code,
+                404,
+            )
+
+    def test_enrollment_racing_start_has_no_lock_inversion(self):
+        Enrollment.objects.filter(user=self.user, course_version=self.course).delete()
+        start, enroll = self.race(
+            ("/api/sessions/", self.start_payload),
+            (f"/api/courses/{self.course.pk}/enroll/", {}),
+        )
+        self.assertEqual(enroll[0], 200, enroll)
+        self.assertIn(start[0], (201, 403), start)
+        self.assertEqual(
+            Enrollment.objects.filter(
+                user=self.user, course_version=self.course
+            ).count(),
+            1,
         )

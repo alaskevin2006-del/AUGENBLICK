@@ -77,7 +77,7 @@ class RuntimeTests(TestCase):
             format="json",
         ).data
 
-    def test_default_scope_includes_whole_pool_over_twenty_questions(self):
+    def test_explicit_all_scope_includes_whole_pool_over_twenty_questions(self):
         from .runtime import build_questions
 
         self.course.payload["items"] = [
@@ -93,7 +93,7 @@ class RuntimeTests(TestCase):
         self.course.save(update_fields=["payload"])
         expected = len(build_questions(self.course.payload, 1))
         self.assertGreater(expected, 20)
-        self.assertEqual(self.start()["progress"]["total"], expected)
+        self.assertEqual(self.start(itemCount=None)["progress"]["total"], expected)
 
     def test_non_object_write_bodies_return_validation_error(self):
         session = self.start(itemCount=1)

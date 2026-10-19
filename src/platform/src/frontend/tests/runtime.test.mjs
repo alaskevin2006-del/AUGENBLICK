@@ -105,3 +105,10 @@ test('next retries identify the same dismissed question instead of advancing new
   assert.ok(button(view,'Check answer'));
   view.unmount();
 });
+
+test('configured batch and preview flag reach the authoritative session endpoint',async()=>{
+  let request;
+  const config={itemCount:4,kinds:['input'],directions:['property-to-name'],filters:[{field:'Group',values:['A']}]};
+  await mod.enterCourse({createSession:async body=>{request=body;return initial;}},'c1','L','Geography',true,config);
+  assert.deepEqual(request,{...config,courseVersionId:'c1',mode:'L',preview:true});
+});

@@ -31,7 +31,10 @@ export interface SessionInfo {
 export interface CreateSessionRequest {
   readonly courseVersionId: string;
   readonly mode: "L" | "T";
-  readonly itemCount?: number;
+  readonly itemCount?: number | null;
+  readonly kinds?: readonly string[];
+  readonly directions?: readonly string[];
+  readonly filters?: readonly CourseFilter[];
   readonly preview?: boolean;
 }
 
@@ -92,6 +95,8 @@ export interface BackendApi {
   listDeveloperCourses(): Promise<readonly CourseSummary[]>;
   listMyCourses(): Promise<readonly CourseSummary[]>;
   publishCourse(id: string): Promise<CourseSummary>;
+  unpublishCourse(id: string): Promise<CourseSummary>;
+  courseSetup(id: string, config: SetupConfig): Promise<CourseSetup>;
   enrollCourse(id: string): Promise<CourseSummary>;
   listCourses(): Promise<readonly CourseSummary[]>;
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
@@ -119,4 +124,16 @@ export interface BackendApi {
 export interface UploadProgress {
   readonly phase: "uploading" | "processing";
   readonly percent: number;
+}
+
+export interface CourseFilter { readonly field: string; readonly values: readonly string[] }
+export interface SetupConfig { readonly kinds?: readonly string[]; readonly directions?: readonly string[]; readonly filters?: readonly CourseFilter[] }
+export interface CourseSetup {
+ readonly course: CourseSummary;
+ readonly availableQuestionCount: number;
+ readonly availableObjectCount: number;
+ readonly kinds: readonly {value: string; count: number}[];
+ readonly directions: readonly {value: string; count: number}[];
+ readonly filters: readonly CourseFilter[];
+ readonly testSubmitted: boolean;
 }

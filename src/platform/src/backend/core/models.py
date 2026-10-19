@@ -13,8 +13,32 @@ class CourseVersion(models.Model):
     engine = models.CharField(max_length=32, default="znawca")
     item_count = models.IntegerField()
     payload = models.JSONField()  # 契约§二完整编译产物
+    status = models.CharField(
+        max_length=16,
+        choices=[("draft", "Draft"), ("published", "Published")],
+        default="draft",
+        db_index=True,
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
     content_hash = models.CharField(max_length=64, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Enrollment(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="enrollments"
+    )
+    course_version = models.ForeignKey(
+        CourseVersion, on_delete=models.PROTECT, related_name="enrollments"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "course_version"], name="uniq_course_enrollment"
+            )
+        ]
 
 
 class Session(models.Model):
@@ -36,6 +60,7 @@ class Session(models.Model):
         on_delete=models.PROTECT,
         related_name="learning_sessions",
     )
+    is_preview = models.BooleanField(default=False)
     runtime = models.JSONField(default=dict)
     mode = models.CharField(max_length=1, choices=MODE_CHOICES)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="active")
@@ -50,13 +75,13 @@ class Session(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "course_version", "mode"],
+                fields=["user", "course_version", "mode", "is_preview"],
                 condition=models.Q(status="active"),
                 name="uniq_active_activity",
             ),
             models.UniqueConstraint(
                 fields=["user", "course_version"],
-                condition=models.Q(status="finished", mode="T"),
+                condition=models.Q(status="finished", mode="T", is_preview=False),
                 name="uniq_submitted_test",
             ),
         ]

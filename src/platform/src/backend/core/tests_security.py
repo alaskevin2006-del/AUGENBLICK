@@ -26,7 +26,7 @@ class UploadSecurityTests(SimpleTestCase):
         with zipfile.ZipFile(data, "w") as archive:
             archive.writestr("large.xlsx", "data")
         with tempfile.TemporaryDirectory() as target, zipfile.ZipFile(data) as archive:
-            archive.infolist()[0].file_size = 1024 * 1024 * 1024 + 1
+            archive.infolist()[0].file_size = 2 * 1024 * 1024 * 1024 + 1
             with self.assertRaises(CourseImportError):
                 _safe_extract(archive, Path(target))
             self.assertEqual(list(Path(target).iterdir()), [])

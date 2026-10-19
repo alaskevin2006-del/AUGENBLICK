@@ -9,6 +9,9 @@ export interface CourseSummary {
   readonly languageCode: string;
   readonly engine: string;
   readonly itemCount: number;
+  readonly status?: "draft" | "published";
+  readonly publishedAt?: string | null;
+  readonly isEnrolled?: boolean;
 }
 
 /** 契约§三：会话状态。 */
@@ -29,6 +32,7 @@ export interface CreateSessionRequest {
   readonly courseVersionId: string;
   readonly mode: "L" | "T";
   readonly itemCount?: number;
+  readonly preview?: boolean;
 }
 
 export interface CreateSessionResponse {
@@ -85,13 +89,34 @@ export interface BackendApi {
   login(username: string, password: string): Promise<LoginResponse>;
   logout(): Promise<void>;
   me(): Promise<AuthUser>;
+  listDeveloperCourses(): Promise<readonly CourseSummary[]>;
+  listMyCourses(): Promise<readonly CourseSummary[]>;
+  publishCourse(id: string): Promise<CourseSummary>;
+  enrollCourse(id: string): Promise<CourseSummary>;
   listCourses(): Promise<readonly CourseSummary[]>;
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
   createSession(request: CreateSessionRequest): Promise<RuntimeSnapshot>;
   answer(sessionId: string, request: AnswerRequest): Promise<RuntimeSnapshot>;
-  advance(sessionId: string, action: "next" | "finish" | "skip", questionId?: string, submissionId?: string): Promise<RuntimeSnapshot>;
+  advance(
+    sessionId: string,
+    action: "next" | "finish" | "skip",
+    questionId?: string,
+    submissionId?: string,
+  ): Promise<RuntimeSnapshot>;
   getSession(sessionId: string): Promise<RuntimeSnapshot>;
   findActiveSession(courseVersionId: string): Promise<SessionInfo | null>;
-  pushEvents(sessionId: string, events: readonly EngineEvent[], resumeToken?: unknown): Promise<PushEventsResponse>;
-  uploadCourse(file: File): Promise<UploadResult>;
+  pushEvents(
+    sessionId: string,
+    events: readonly EngineEvent[],
+    resumeToken?: unknown,
+  ): Promise<PushEventsResponse>;
+  uploadCourse(
+    file: File,
+    onProgress?: (state: UploadProgress) => void,
+  ): Promise<UploadResult>;
+}
+
+export interface UploadProgress {
+  readonly phase: "uploading" | "processing";
+  readonly percent: number;
 }

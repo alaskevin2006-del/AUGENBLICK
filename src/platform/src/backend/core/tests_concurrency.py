@@ -10,7 +10,7 @@ from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
 from rest_framework.test import APIClient
 
-from .models import CourseVersion, Event, Session, Submission
+from .models import Enrollment, CourseVersion, Event, Session, Submission
 
 
 @skipUnless(
@@ -27,6 +27,7 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
             title="Concurrency",
             language_code="en",
             item_count=3,
+            status="published",
             content_hash="c" * 64,
             payload={
                 "columns": [
@@ -50,6 +51,7 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
                 ],
             },
         )
+        Enrollment.objects.create(user=self.user, course_version=self.course)
         self.start_payload = {
             "courseVersionId": self.course.pk,
             "mode": "T",
@@ -102,6 +104,20 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         return response.data
+
+    def test_concurrent_enrollment_is_idempotent(self):
+        Enrollment.objects.filter(user=self.user, course_version=self.course).delete()
+        request = (f"/api/courses/{self.course.pk}/enroll/", {})
+        results = self.race(request, request)
+        self.assertEqual([status for status, _ in results], [200, 200], results)
+        self.assertEqual(results[0][1], results[1][1])
+        self.assertTrue(results[0][1]["isEnrolled"])
+        self.assertEqual(
+            Enrollment.objects.filter(
+                user=self.user, course_version=self.course
+            ).count(),
+            1,
+        )
 
     def test_same_submission_commits_one_answer_and_event(self):
         session = self.start()

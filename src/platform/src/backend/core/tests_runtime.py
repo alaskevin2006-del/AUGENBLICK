@@ -2,7 +2,7 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
-from .models import CourseVersion, Session
+from .models import Enrollment, CourseVersion, Session
 
 
 class RuntimeTests(TestCase):
@@ -16,6 +16,7 @@ class RuntimeTests(TestCase):
             title="Demo",
             language_code="en",
             item_count=3,
+            status="published",
             content_hash="a" * 64,
             payload={
                 "columns": [
@@ -43,6 +44,8 @@ class RuntimeTests(TestCase):
                 ],
             },
         )
+
+        Enrollment.objects.create(user=self.user, course_version=self.course)
 
     def start(self, mode="T", **kwargs):
         r = self.client.post(
@@ -464,4 +467,3 @@ class HealthTests(TestCase):
             response = self.client.get("/api/health/")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("private detail", response.content.decode())
-

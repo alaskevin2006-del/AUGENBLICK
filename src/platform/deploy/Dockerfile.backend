@@ -11,4 +11,4 @@ RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home a
 USER app
 EXPOSE 8000
 # Migrations run explicitly before deployment, never on automatic restarts.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "180", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-"]

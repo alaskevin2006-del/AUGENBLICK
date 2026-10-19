@@ -78,6 +78,6 @@ REST_FRAMEWORK = {
     "NUM_PROXIES": 1,
 }
 
-# 上传走临时文件而非内存（课程 ZIP ≤200MB，契约§九）
+# 上传走临时文件而非内存（课程 ZIP ≤512 MiB）
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024

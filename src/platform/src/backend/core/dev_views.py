@@ -2,7 +2,7 @@
 import tempfile
 import zipfile
 import stat
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from rest_framework import status as http
 from rest_framework.permissions import BasePermission, IsAuthenticated
@@ -11,7 +11,8 @@ from rest_framework.views import APIView
 
 from .importer import CourseImportError, import_course_dir
 
-MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # ZIP ≤200MB
+MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 
 
 class IsStaffDeveloper(BasePermission):
@@ -32,7 +33,7 @@ class CourseUploadView(APIView):
             return Response({"error": "缺少文件", "detail": "multipart 字段 'file' 缺失。"},
                             status=http.HTTP_400_BAD_REQUEST)
         if upload.size > MAX_UPLOAD_BYTES:
-            return Response({"error": "文件过大", "detail": "ZIP 超过 200MB 限制。"},
+            return Response({"error": "文件过大", "detail": "ZIP 超过 512 MiB 限制。"},
                             status=http.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
         try:
@@ -44,6 +45,9 @@ class CourseUploadView(APIView):
                 except zipfile.BadZipFile:
                     return Response({"error": "无效的 ZIP", "detail": "上传文件不是合法的 ZIP 压缩包。"},
                                     status=http.HTTP_400_BAD_REQUEST)
+                except (NotImplementedError, RuntimeError):
+                    return Response({"error": "不支持的压缩格式", "detail": "请使用普通 ZIP（Deflate 或不压缩），不要加密。"},
+                                    status=http.HTTP_400_BAD_REQUEST)
                 result = import_course_dir(_locate_course_dir(tmp_path))
         except CourseImportError as e:
             return Response({"error": e.error, "detail": e.detail}, status=http.HTTP_400_BAD_REQUEST)
@@ -54,11 +58,14 @@ def _safe_extract(zf: zipfile.ZipFile, target: Path):
     """解压并防 zip-slip：成员路径必须落在目标目录内。"""
     root = target.resolve()
     members = zf.infolist()
-    if len(members) > 20000 or sum(m.file_size for m in members) > 1024 * 1024 * 1024:
-        raise CourseImportError("ZIP 过大", "解压内容不得超过 1GB 或 20000 个文件。")
+    if len(members) > 20000 or sum(m.file_size for m in members) > MAX_EXPANDED_BYTES:
+        raise CourseImportError("ZIP 过大", "解压内容不得超过 2 GiB 或 20000 个文件。")
     for member in members:
         if member.flag_bits & 1 or stat.S_ISLNK(member.external_attr >> 16):
             raise CourseImportError("非法的 ZIP", "不支持加密文件或符号链接。")
+        portable = member.filename.replace("\\", "/")
+        if PureWindowsPath(portable).drive or PurePosixPath(portable).is_absolute() or ".." in PurePosixPath(portable).parts:
+            raise CourseImportError("非法的 ZIP", f"ZIP 内含越界路径：{member.filename}")
         dest = (root / member.filename).resolve()
         if dest != root and root not in dest.parents:
             raise CourseImportError("非法的 ZIP", f"ZIP 内含越界路径：{member.filename}")

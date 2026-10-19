@@ -5,6 +5,7 @@ export type PublicQuestion = Omit<Question, "acceptedAnswers" | "options"> & {
 };
 export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; readonly needsAnother?: boolean; }
 export interface RuntimeSnapshot {
+  readonly isPreview?: boolean;
   readonly sessionId: string;
   readonly courseVersionId: string;
   readonly mode: "L" | "T";

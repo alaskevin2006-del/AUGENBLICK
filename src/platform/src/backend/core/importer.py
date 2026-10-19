@@ -8,9 +8,13 @@ import hashlib
 import re
 import shutil
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
+from xml.etree.ElementTree import ParseError
 
 import openpyxl
 from django.conf import settings
+from django.db import transaction
+from openpyxl.utils.exceptions import InvalidFileException
 
 from core.models import CourseVersion
 
@@ -22,6 +26,9 @@ MEDIA_EXTENSIONS = {
 }
 LANGUAGE_SUFFIX = re.compile(r"^(.+?)_([A-Za-z]{2,3})$")
 FEEDBACK_PATTERN = re.compile(r"^(correct|incorrect).*\.mp3$", re.IGNORECASE)
+MAX_WORKBOOK_ROWS = 20000
+MAX_WORKBOOK_COLUMNS = 256
+MAX_WORKBOOK_CELLS = 1000000
 
 
 class CourseImportError(Exception):
@@ -76,6 +83,7 @@ def cell_media_category(raw: str):
     return ("media", kinds[0], parts)
 
 
+@transaction.atomic
 def import_course_dir(course_dir) -> dict:
     """导入一个 Znawca V2 课程目录。
 
@@ -172,10 +180,29 @@ def _import_workbook(course_dir, workbook, base, lang, media_index, feedback) ->
             "warnings": [],
         }
 
-    wb = openpyxl.load_workbook(workbook, read_only=True, data_only=True)
-    ws = wb.worksheets[0]
-    rows = [["" if c is None else str(c) for c in row] for row in ws.iter_rows(values_only=True)]
-    wb.close()
+    wb = None
+    try:
+        # XLSX is itself a ZIP. Bound its expansion before openpyxl reads XML.
+        with ZipFile(workbook) as archive:
+            entries = archive.infolist()
+            if len(entries) > 10000 or sum(e.file_size for e in entries) > 128 * 1024 * 1024 or any(e.file_size > 64 * 1024 * 1024 for e in entries):
+                raise CourseImportError("工作簿过大", f"{workbook.name} 解压后的工作簿超过限制，请拆分课程或清除多余格式。")
+        wb = openpyxl.load_workbook(workbook, read_only=True, data_only=True)
+        ws = wb.worksheets[0]
+        row_count, column_count = ws.max_row or 0, ws.max_column or 0
+        if row_count > MAX_WORKBOOK_ROWS or column_count > MAX_WORKBOOK_COLUMNS or row_count * column_count > MAX_WORKBOOK_CELLS:
+            raise CourseImportError("工作簿范围过大", f"{workbook.name} 工作表范围超过 20000 行、256 列或 100 万单元格，请删除多余空行列及格式后重新保存。")
+        rows, cell_count = [], 0
+        for row in ws.iter_rows(values_only=True):
+            cell_count += len(row)
+            if len(rows) >= MAX_WORKBOOK_ROWS or len(row) > MAX_WORKBOOK_COLUMNS or cell_count > MAX_WORKBOOK_CELLS:
+                raise CourseImportError("工作簿范围过大", f"{workbook.name} 的实际单元格范围超过限制，请拆分课程。")
+            rows.append(["" if c is None else str(c) for c in row])
+    except (BadZipFile, InvalidFileException, ParseError, KeyError, ValueError, IndexError) as error:
+        raise CourseImportError("工作簿无法读取", f"{workbook.name} 不是有效的 Excel 工作簿，请重新保存为 .xlsx 后上传。") from error
+    finally:
+        if wb is not None:
+            wb.close()
 
     def cell(row, col):  # row/col 均 1 起
         if row - 1 < len(rows) and col - 1 < len(rows[row - 1]):

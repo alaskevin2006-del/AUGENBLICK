@@ -129,3 +129,61 @@ body .app-shell .workspace .content { flex: 1 1 auto; min-height: 0; overflow-y:
 .upload-failure strong { color: #e8a68c; }
 .upload-failure p { margin: 0; color: #cbd3ca; }
 .warning-list li { color: #e8cf9a; }
+
+/* Approved minimal shell: flat surfaces and only functional navigation. */
+:root { font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif; }
+body { min-width: 320px; }
+body .app-shell, .host-shell { background: #071a13; }
+body .title-bar { height: auto; min-height: 76px; padding: 16px max(24px, calc((100vw - 1180px) / 2)); gap: 18px; background: #092219; box-shadow: none; border-bottom: 1px solid #294338; flex-wrap: wrap; }
+body .brand { font-family: inherit; font-size: 17px; font-weight: 600; letter-spacing: .12em; color: #eee9d7; white-space: nowrap; }
+.topbar-side { flex-wrap: wrap; gap: 22px; }
+.topbar-side nav { display: flex; gap: 18px; }
+.nav-link { border: 0; background: transparent; color: #b9c9bf; padding: 7px 0; font-size: 15px; }
+.nav-link[aria-current="page"] { color: #e1c477; border-bottom: 1px solid #c6a24b; }
+.title-actions { flex-wrap: wrap; }
+body .metal-button, body .gold-button { box-shadow: none; border-radius: 4px; padding: 9px 16px; font-size: 14px; }
+body .metal-button { background: transparent; border-color: #9c833e; color: #e1c477; }
+body .gold-button { background: #d2b05a; border-color: #d2b05a; color: #10251c; }
+body button:disabled { cursor: default; opacity: .5; }
+body button:focus-visible, body select:focus-visible { outline: 2px solid #eed899; outline-offset: 3px; }
+body .content { padding: 48px 24px; }
+.page-dev, .page-courses { width: 100%; max-width: 1180px; margin: 0 auto; }
+body .page-heading { align-items: center; gap: 24px; flex-wrap: wrap; margin: 0 0 28px; }
+body .page-heading h1, .page-courses > h1 { font: 600 24px/1.35 "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0 0 28px; }
+body .page-heading h1 { margin: 0; }
+body .course-grid { grid-template-columns: repeat(auto-fill,minmax(270px,340px)); gap: 20px; }
+body .course-card { min-height: 0; background: #0d291f; box-shadow: none; border: 1px solid #2d493c; border-radius: 5px; }
+body .course-copy { padding: 24px; }
+body .course-copy h2 { font: 600 19px/1.4 "Segoe UI", "Microsoft YaHei", sans-serif; }
+body .course-copy p:not(.section-label) { min-height: 0; font-size: 14px; margin: 12px 0 24px; }
+.course-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.table-scroll { overflow-x: auto; }
+.dev-table { border: 1px solid #2d493c; background: #0b261c; margin: 24px 0; }
+.dev-table th, .dev-table td { padding: 22px 24px; border-color: #2d493c; font-size: 15px; }
+.dev-table th { color: #b9c9bf; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.course-status { white-space: nowrap; }
+.course-status.draft { color: #e1c477; }
+.course-status.published { color: #9cd7b6; }
+.page-note { color: #a8bdb0; font-size: 14px; line-height: 1.7; }
+.upload-form { gap: 12px; }
+.upload-form input { max-width: 260px; }
+.selected-file { font-size: 14px; color: #b9c9bf; overflow-wrap: anywhere; }
+.upload-status progress { width: min(360px,100%); accent-color: #d2b05a; }
+.inline-error { padding: 12px 24px; color: #efb7a4; background: #2e231b; overflow-wrap: anywhere; }
+.inline-error p { margin: 8px 0; }
+.page-loading { padding: 12px 24px; color: #b9c9bf; margin: 0; }
+body .app-shell.login-page { display: grid; place-items: center; overflow: auto; }
+.login-card { background: #0d291f; box-shadow: none; border-color: #2d493c; padding: 32px; }
+.login-card .topbar-select { display: block; margin-inline-start: auto; margin-bottom: 24px; }
+.login-card h1 { font: 600 24px/1.4 "Segoe UI", "Microsoft YaHei", sans-serif; }
+.host-title { font-family: inherit; font-size: 14px; }
+.host-dialog { background: #0d291f; box-shadow: none; }
+@media (max-width: 700px) {
+ body .title-bar { padding: 16px; }
+ body .content { padding: 28px 16px; }
+ .topbar-side { gap: 14px; }
+ .topbar-user { display: none; }
+ .dev-table th,.dev-table td { padding: 14px; }
+ body .course-grid { grid-template-columns: minmax(0,1fr); }
+ .upload-form { width: 100%; }
+}

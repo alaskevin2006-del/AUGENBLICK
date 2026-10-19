@@ -1,4 +1,5 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
+import type { PageRoute } from "../orchestrator/routes";
 import type { AuthUser } from "../orchestrator/types";
 import { TopBar } from "../shell/TopBar";
 import { useT } from "../i18n";
@@ -18,38 +19,64 @@ export function ActivityHost({
 }: {
   title: string;
   readonly user: AuthUser;
-  readonly onNavigate: (screen: "courses" | "developer") => void;
+  readonly onNavigate: (screen: PageRoute) => void;
   readonly onLogout: () => void;
   /** 确认退出后回调（编排器负责 flush 事件并返回课程列表）。 */
   onExit(): void;
   children: ReactNode;
 }) {
   const t = useT();
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingExit, setPendingExit] = useState<(() => void) | null>(null);
   return (
     <div className="host-shell">
       <TopBar
         user={user}
-        onNavigate={onNavigate}
-        onLogout={onLogout}
+        onNavigate={(target) => setPendingExit(() => () => onNavigate(target))}
+        onLogout={() => setPendingExit(() => onLogout)}
         title={title}
         actions={
-          <button className="metal-button" type="button" onClick={() => setConfirmOpen(true)}>
+          <button
+            className="metal-button"
+            type="button"
+            onClick={() => setPendingExit(() => onExit)}
+          >
             {t("exit.confirm")}
           </button>
         }
       />
       <div className="host-content">
-        <ActivityErrorBoundary onExit={onExit}>{children}</ActivityErrorBoundary>
+        <ActivityErrorBoundary onExit={onExit}>
+          {children}
+        </ActivityErrorBoundary>
       </div>
-      {confirmOpen && (
+      {pendingExit && (
         <div className="dialog-backdrop">
-          <section className="host-dialog" role="dialog" aria-modal="true" aria-label={t("exit.title")}>
+          <section
+            className="host-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("exit.title")}
+          >
             <h1>{t("exit.title")}</h1>
             <p>{t("exit.body")}</p>
             <div className="dialog-actions">
-              <button className="metal-button" type="button" onClick={() => setConfirmOpen(false)}>{t("exit.stay")}</button>
-              <button className="gold-button" type="button" onClick={() => { setConfirmOpen(false); onExit(); }}>{t("exit.confirm")}</button>
+              <button
+                className="metal-button"
+                type="button"
+                onClick={() => setPendingExit(null)}
+              >
+                {t("exit.stay")}
+              </button>
+              <button
+                className="gold-button"
+                type="button"
+                onClick={() => {
+                  setPendingExit(null);
+                  pendingExit();
+                }}
+              >
+                {t("exit.confirm")}
+              </button>
             </div>
           </section>
         </div>
@@ -63,7 +90,10 @@ interface BoundaryState {
 }
 
 /** E_TECH：活动技术失败 → 展示「该活动暂时不可用」并允许返回。 */
-class ActivityErrorBoundary extends Component<{ onExit(): void; children: ReactNode }, BoundaryState> {
+class ActivityErrorBoundary extends Component<
+  { onExit(): void; children: ReactNode },
+  BoundaryState
+> {
   override state: BoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): BoundaryState {
@@ -91,7 +121,9 @@ function HostErrorView({ onExit }: { readonly onExit: () => void }) {
       <div>
         <h1>{t("hostError.title")}</h1>
         <p>{t("hostError.body")}</p>
-        <button className="gold-button" type="button" onClick={onExit}>{t("results.back")}</button>
+        <button className="gold-button" type="button" onClick={onExit}>
+          {t("results.back")}
+        </button>
       </div>
     </div>
   );

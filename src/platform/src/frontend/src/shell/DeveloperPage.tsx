@@ -1,136 +1,226 @@
 import { useRef, useState } from "react";
-import { ApiError, type CourseSummary, type UploadResult } from "../orchestrator/types";
+import {
+  ApiError,
+  type CourseSummary,
+  type UploadProgress,
+  type UploadResult,
+} from "../orchestrator/types";
 import { getBackend } from "../orchestrator/api";
-import { useT } from "../i18n";
-
-/**
- * 开发者页（契约§九）：课程版本列表 + ZIP 上传。
- * 仅 isDeveloper 可达；非开发者直接访问显示 403 提示。
- */
+import { validateUpload } from "../orchestrator/upload";
+import { useT, type ShellKey } from "../i18n";
 export function DeveloperPage({
   isDeveloper,
   courses,
+  disabled,
   onUploaded,
+  onPreview,
+  onPublish,
 }: {
   readonly isDeveloper: boolean;
   readonly courses: readonly CourseSummary[];
-  readonly onUploaded: () => void;
+  readonly disabled?: boolean;
+  readonly onUploaded: () => Promise<void> | void;
+  readonly onPreview: (id: string, mode: "L" | "T") => void;
+  readonly onPublish: (id: string) => void;
 }) {
   const t = useT();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const lock = useRef(false);
+  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
-  const [failure, setFailure] = useState<{ error: string; detail: string | null } | null>(null);
-
-  if (!isDeveloper) {
-    return (
-      <div className="host-error" role="alert">
-        <div>
-          <h1>{t("dev.forbidden")}</h1>
-          <p>{t("dev.forbiddenBody")}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const upload = async (): Promise<void> => {
-    const file = fileRef.current?.files?.[0];
-    setResult(null);
+  const [failure, setFailure] = useState<{
+    key: ShellKey;
+    status?: number;
+    detail?: string;
+  } | null>(null);
+  if (!isDeveloper) return <p role="alert">{t("dev.forbidden")}</p>;
+  const upload = async () => {
+    if (lock.current) return;
     setFailure(null);
+    setResult(null);
     if (!file) {
-      setFailure({ error: t("dev.noFile"), detail: null });
+      setFailure({ key: "dev.noFile" });
       return;
     }
+    const invalid = validateUpload(file);
+    if (invalid) {
+      setFailure({ key: invalid });
+      return;
+    }
+    lock.current = true;
     setBusy(true);
+    setProgress({ phase: "uploading", percent: 0 });
     try {
       const backend = await getBackend();
-      const uploaded = await backend.uploadCourse(file);
+      const uploaded = await backend.uploadCourse(file, setProgress);
       setResult(uploaded);
-      onUploaded(); // 刷新课程版本列表
-    } catch (cause) {
-      if (cause instanceof ApiError) {
-        const body = cause.body as { error?: unknown; detail?: unknown } | null;
+      setFile(null);
+      await onUploaded();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const body = error.body as { error?: unknown; detail?: unknown } | null;
+        const detail = [body?.error, body?.detail]
+          .filter((v): v is string => typeof v === "string")
+          .join(" · ");
         setFailure({
-          error: typeof body?.error === "string" ? body.error : cause.message,
-          detail: typeof body?.detail === "string" ? body.detail : null,
+          key:
+            error.status === 413
+              ? "upload.tooLarge"
+              : error.status === 0
+                ? "upload.network"
+                : error.status === 408 || error.status === 504
+                  ? "upload.timeout"
+                  : "upload.rejected",
+          status: error.status,
+          ...(detail ? { detail } : {}),
         });
-      } else {
-        setFailure({ error: cause instanceof Error ? cause.message : String(cause), detail: null });
-      }
+      } else setFailure({ key: "upload.network" });
     } finally {
+      lock.current = false;
       setBusy(false);
+      setProgress(null);
     }
   };
-
   return (
     <div className="workspace">
       <section className="content">
         <div className="page-dev">
           <div className="page-heading">
-            <div>
-              <p className="eyebrow">{t("dev.title")}</p>
-              <h1>{t("dev.heading")}</h1>
-            </div>
-          </div>
-          <table className="dev-table">
-            <thead>
-              <tr>
-                <th>{t("dev.colVersion")}</th>
-                <th>{t("dev.colTitle")}</th>
-                <th>{t("dev.colLang")}</th>
-                <th>{t("dev.colItems")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {courses.map((course) => (
-                <tr key={course.courseVersionId}>
-                  <td dir="auto">{course.courseVersionId}</td>
-                  <td dir="auto">{course.title}</td>
-                  <td>{course.languageCode}</td>
-                  <td>{course.itemCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <section className="upload-panel">
-            <h2>{t("dev.uploadTitle")}</h2>
+            <h1>{t("dev.heading")}</h1>
             <div className="upload-form">
-              <input ref={fileRef} type="file" accept=".zip" />
-              <button className="gold-button" type="button" disabled={busy} onClick={() => void upload()}>
-                {busy ? t("dev.uploading") : t("dev.upload")}
+              <input
+                type="file"
+                accept=".zip"
+                aria-label={t("dev.uploadTitle")}
+                disabled={busy || disabled}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setFailure(null);
+                  setResult(null);
+                  event.target.value = "";
+                }}
+              />
+              <button
+                className="gold-button"
+                disabled={busy || disabled}
+                onClick={() => void upload()}
+              >
+                {t(busy ? "dev.uploading" : "dev.upload")}
               </button>
             </div>
-            {failure && (
-              <div className="upload-result upload-failure" role="alert">
-                <strong>{t("dev.failed")}: {failure.error}</strong>
-                {failure.detail && <p dir="auto">{failure.detail}</p>}
-              </div>
-            )}
-            {result && (
-              <div className="upload-result">
-                <strong>{t("dev.imported")}</strong>
-                <ul>
-                  {result.imported.map((item) => (
-                    <li key={item.courseVersionId} dir="auto">
-                      {item.courseVersionId} — {item.title} / {item.languageCode} / {item.itemCount}
-                      {item.reused && <em>（{t("dev.reused")}）</em>}
-                    </li>
-                  ))}
-                </ul>
-                {result.warnings.length > 0 && (
-                  <>
-                    <strong>{t("dev.warnings")}</strong>
-                    <ul className="warning-list">
-                      {result.warnings.map((warning, index) => (
-                        <li key={index} dir="auto">{warning}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
+          </div>
+          {file && (
+            <p className="selected-file" dir="auto">
+              {file.name}
+            </p>
+          )}
+          {progress && (
+            <div role="status" className="upload-status">
+              <p>
+                {progress.phase === "processing"
+                  ? t("upload.processing")
+                  : t("upload.progress", { percent: progress.percent })}
+              </p>
+              <progress
+                max={100}
+                value={progress.percent}
+                aria-label={t("dev.uploading")}
+              />
+            </div>
+          )}
+          {failure && (
+            <div className="inline-error" role="alert">
+              <p>{t(failure.key, { status: failure.status ?? 0 })}</p>
+              {failure.detail && <p dir="auto">{failure.detail}</p>}
+            </div>
+          )}
+          {result && (
+            <div className="upload-result" role="status">
+              <strong>{t("upload.success")}</strong>
+              <ul>
+                {result.imported.map((item) => (
+                  <li key={item.courseVersionId} dir="auto">
+                    {item.title}
+                  </li>
+                ))}
+              </ul>
+              {result.warnings.length > 0 && (
+                <>
+                  <strong>{t("dev.warnings")}</strong>
+                  <ul>
+                    {result.warnings.map((warning, index) => (
+                      <li key={index} dir="auto">
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+          <div className="table-scroll">
+            <table className="dev-table">
+              <thead>
+                <tr>
+                  <th>{t("dev.colTitle")}</th>
+                  <th>{t("dev.status")}</th>
+                  <th>{t("dev.actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course) => (
+                  <tr key={course.courseVersionId}>
+                    <td dir="auto">{course.title}</td>
+                    <td>
+                      <span
+                        className={`course-status ${course.status ?? "draft"}`}
+                      >
+                        {t(
+                          course.status === "published"
+                            ? "dev.published"
+                            : "dev.draft",
+                        )}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="course-actions">
+                        <button
+                          className="metal-button"
+                          disabled={
+                            busy || disabled || course.engine !== "znawca"
+                          }
+                          onClick={() => onPreview(course.courseVersionId, "L")}
+                        >
+                          {t("dev.previewL")}
+                        </button>
+                        <button
+                          className="metal-button"
+                          disabled={
+                            busy || disabled || course.engine !== "znawca"
+                          }
+                          onClick={() => onPreview(course.courseVersionId, "T")}
+                        >
+                          {t("dev.previewT")}
+                        </button>
+                        {course.status !== "published" && (
+                          <button
+                            className="gold-button"
+                            disabled={busy || disabled}
+                            onClick={() => onPublish(course.courseVersionId)}
+                          >
+                            {t("dev.publish")}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {courses.length === 0 && <p>{t("courses.empty")}</p>}
+          <p className="page-note">{t("dev.note")}</p>
         </div>
       </section>
     </div>

@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CourseVersion, Event, Session, Submission
+from .models import CourseVersion, Enrollment, Event, Session, Submission
 from .runtime import build_questions, initial_state, public_question, snapshot
 from .scoring import evaluate
 
@@ -37,7 +37,22 @@ def owned(request, session_id, lock=False):
     qs = Session.objects.select_related("course_version").filter(user=request.user)
     if lock:
         qs = qs.select_for_update()
-    return get_object_or_404(qs, pk=session_id)
+    session = get_object_or_404(qs, pk=session_id)
+    if session.is_preview:
+        if not request.user.is_staff:
+            raise PermissionDenied("Preview access requires a developer account.")
+    else:
+        if request.user.is_staff:
+            raise PermissionDenied("Developers must use preview sessions.")
+        if session.course_version.status != "published":
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("Course is not published.")
+        if not Enrollment.objects.filter(
+            user=request.user, course_version=session.course_version
+        ).exists():
+            raise PermissionDenied("Join this course before learning.")
+    return session
 
 
 def record(session, kind, payload):
@@ -56,16 +71,19 @@ def record(session, kind, payload):
 
 class CourseListView(AuthenticatedView):
     def get(self, request):
+        from .catalog_views import course_summary
+
+        enrolled = set(
+            Enrollment.objects.filter(user=request.user).values_list(
+                "course_version_id", flat=True
+            )
+        )
         return Response(
             [
-                {
-                    "courseVersionId": c.pk,
-                    "title": c.title,
-                    "languageCode": c.language_code,
-                    "engine": c.engine,
-                    "itemCount": c.item_count,
-                }
-                for c in CourseVersion.objects.order_by("course_version_id")
+                course_summary(c, c.pk in enrolled)
+                for c in CourseVersion.objects.filter(status="published").order_by(
+                    "course_version_id"
+                )
             ]
         )
 
@@ -84,6 +102,21 @@ class SessionListView(AuthenticatedView):
             .filter(user=request.user)
             .order_by("-created_at")
         )
+        preview = request.query_params.get("preview", "false")
+        if preview not in ("true", "false"):
+            raise ValidationError("preview query parameter must be true or false.")
+        if preview == "true":
+            if not request.user.is_staff:
+                raise PermissionDenied("Preview access requires a developer account.")
+            qs = qs.filter(is_preview=True)
+        elif request.user.is_staff:
+            qs = qs.none()
+        else:
+            qs = qs.filter(
+                is_preview=False,
+                course_version__status="published",
+                course_version__enrollments__user=request.user,
+            )
         if request.query_params.get("status"):
             qs = qs.filter(status=request.query_params["status"])
         if request.query_params.get("courseVersionId"):
@@ -94,18 +127,35 @@ class SessionListView(AuthenticatedView):
     def post(self, request):
         # Lock the owner, including the empty-session case, to serialize start/restart.
         get_user_model().objects.select_for_update().get(pk=request.user.pk)
-        course = get_object_or_404(
-            CourseVersion, pk=request.data.get("courseVersionId")
+        preview = request.data.get("preview", False)
+        if type(preview) is not bool:
+            raise ValidationError("preview must be a boolean.")
+        if preview and not request.user.is_staff:
+            raise PermissionDenied("Preview access requires a developer account.")
+        if request.user.is_staff and not preview:
+            raise PermissionDenied("Developers must use preview sessions.")
+        available = (
+            CourseVersion.objects.all()
+            if preview
+            else CourseVersion.objects.filter(status="published")
         )
+        course = get_object_or_404(available, pk=request.data.get("courseVersionId"))
+        if (
+            not preview
+            and not Enrollment.objects.filter(
+                user=request.user, course_version=course
+            ).exists()
+        ):
+            raise PermissionDenied("Join this course before learning.")
         if course.engine != "znawca":
             raise ValidationError("This engine is not available yet.")
         mode = request.data.get("mode")
         if mode not in ("L", "T"):
             raise ValidationError("mode must be L or T.")
         sessions = Session.objects.filter(
-            user=request.user, course_version=course, mode=mode
+            user=request.user, course_version=course, mode=mode, is_preview=preview
         )
-        if mode == "T" and sessions.filter(status="finished").exists():
+        if mode == "T" and not preview and sessions.filter(status="finished").exists():
             raise Conflict("This test has already been submitted.")
         count = request.data.get("itemCount")
         if count is not None and (type(count) is not int or count < 1 or count > 1000):
@@ -125,6 +175,7 @@ class SessionListView(AuthenticatedView):
             mode=mode,
             random_seed=seed,
             runtime=initial_state(questions),
+            is_preview=preview,
         )
         record(
             session, "activityReady", {"mode": mode, "questionCount": len(questions)}
@@ -284,7 +335,10 @@ class SessionFinishView(AuthenticatedView):
         record(
             s,
             "activityFinished",
-            {"totalScore": s.total_score, "attemptConsumed": s.mode == "T"},
+            {
+                "totalScore": s.total_score,
+                "attemptConsumed": s.mode == "T" and not s.is_preview,
+            },
         )
         return Response(snapshot(s))
 

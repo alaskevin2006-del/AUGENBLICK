@@ -275,6 +275,7 @@ def snapshot(session):
     q = questions.get(queue[0]) if queue and session.status == "active" else None
     return {
         "sessionId": str(session.id),
+        "isPreview": session.is_preview,
         "courseVersionId": session.course_version_id,
         "title": session.course_version.title,
         "languageCode": session.course_version.language_code,

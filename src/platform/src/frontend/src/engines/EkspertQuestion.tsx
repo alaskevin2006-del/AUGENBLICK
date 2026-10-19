@@ -28,12 +28,12 @@ export function EkspertAtlas({reference,locale}:{reference:any;locale:string}) {
   return <section className="ekspert-atlas">
     <div className="ekspert-axes">{reference.axes.map((axis:any)=><label key={axis.id}><span>{axis.name||axis.id}</span>
       <select value={filters[axis.id]||""} onChange={e=>setFilters({...filters,[axis.id]:e.target.value})}>
-        <option value="">{t.all}</option>{Array.from(new Set(reference.items.map((item:any)=>String(item.axes[axis.id]??"")))).map(value=><option key={String(value)} value={String(value)}>{String(value)}</option>)}
+        <option value="">{t.all}</option>{Array.from(new Set(reference.items.map((item:any)=>item.axes[axis.id]??""))).map(value=><option key={String(value)} value={String(value)}>{typeof value==="boolean"?(value?t.yes:t.no):String(value)}</option>)}
       </select></label>)}</div>
     <div className="ekspert-atlas-grid">{items.map((item:any)=><article key={item.id}>
       <button type="button" className="metal-button" aria-expanded={open===item.id} onClick={()=>setOpen(open===item.id?null:item.id)}>{item.name}</button>
       {item.media && <img className="ekspert-object" src={item.media.path} alt=""/>}
-      {open===item.id && <><dl>{Object.entries(item.axes).map(([key,value])=><div key={key}><dt>{reference.axes.find((a:any)=>a.id===key)?.name||key}</dt><dd>{String(value)}</dd></div>)}</dl>
+      {open===item.id && <><dl>{Object.entries(item.axes).map(([key,value])=><div key={key}><dt>{reference.axes.find((a:any)=>a.id===key)?.name||key}</dt><dd>{typeof value==="boolean"?(value?t.yes:t.no):String(value)}</dd></div>)}</dl>
         <dl>{Object.entries(item.features).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{Array.isArray(value)?value.join(", "):typeof value==="object"?JSON.stringify(value):String(value)}</dd></div>)}</dl></>}
     </article>)}</div>
   </section>;

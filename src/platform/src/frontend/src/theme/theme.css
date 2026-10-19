@@ -188,7 +188,7 @@ body .app-shell.login-page { display: grid; place-items: center; overflow: auto;
  .upload-form { width: 100%; }
 }
 
-.course-setup { max-width: 880px; }
+body .content.course-setup { width: 100%; max-width: none; padding-inline: max(24px, calc((100% - 880px) / 2)); }
 .course-setup fieldset { border: 1px solid #315143; padding: 18px; margin: 18px 0; border-radius: 4px; }
 .course-setup legend { padding-inline: 8px; color: #d5b55d; }
 .course-setup label { display: inline-flex; align-items: center; gap: 10px; margin: 8px 24px 8px 0; }

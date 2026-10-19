@@ -12,7 +12,7 @@ before(async () => {
   const outfile = path.join(temp, "shell.mjs");
   await build({
     stdin: {
-      contents: `export {RecordsPage} from './src/shell/RecordsPage'; export {CourseSetupPage} from './src/shell/CourseSetupPage'; export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
+      contents: `export {CourseNav} from './src/shell/CourseNav'; export {courseRoute,courseTab,courseHash,legacyCourseHash} from './src/orchestrator/routes'; export {RecordsPage} from './src/shell/RecordsPage'; export {CourseSetupPage} from './src/shell/CourseSetupPage'; export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
       resolveDir: process.cwd(),
       loader: "ts",
     },
@@ -266,6 +266,7 @@ test("delayed staff identity and setup responses cannot cross logout and student
       releaseMe = resolve;
     });
   backend.listDeveloperCourses = async () => [course];
+  backend.courseRecords=async()=>({course,canStudy:true});
   backend.courseSetup = () =>
     new Promise((resolve) => {
       releaseSession = resolve;
@@ -448,6 +449,7 @@ test("refresh of encoded course deep link shows identical setup for either accou
     const backend=await mod.getBackend();backend.me=async()=>user;
     backend.listDeveloperCourses=backend.listCourses=async()=>[course];
     backend.courseSetup=async id=>{assert.equal(id,'pl@1');return setup;};
+    backend.courseRecords=async()=>({course:{...course,courseVersionId:'pl@1'},canStudy:true});
     window.location.hash='#/course/pl%401';let view;
     await act(async()=>{view=Renderer.create(React.createElement(mod.App));});
     assert.equal(window.location.hash,'#/course/pl%401');
@@ -459,8 +461,12 @@ test("refresh of encoded course deep link shows identical setup for either accou
   }
   assert.equal(snapshots[0],snapshots[1]);
 });
-test('history and difficulties routes stay accessible to both roles', () => {
- for (const isDeveloper of [true,false]) {assert.equal(mod.roleRoute({isDeveloper}, '#/history?course=c1'), 'history'); assert.equal(mod.roleRoute({isDeveloper}, '#/difficulties'), 'difficulties');}
+test('legacy records links retain course while unscoped links return role home',()=>{
+ for(const isDeveloper of [true,false])assert.equal(mod.roleRoute({isDeveloper},'#/history'),isDeveloper?'developer':'courses');
+ assert.equal(mod.legacyCourseHash('#/history?course=a%2Fb%401'),'#/course/a%2Fb%401/learning-history');
+ assert.equal(mod.legacyCourseHash('#/difficulties?course=c1'),'#/course/c1/difficulties');
+ assert.equal(mod.legacyCourseHash('#/history'),null);
+ assert.equal(mod.courseRoute('#/course/a%2Fb%401/test-history'),'a/b@1');assert.equal(mod.courseTab('#/course/a%2Fb%401/test-history'),'test-history');
 });
 test('withdraw requires confirmation; cancel preserves enrollment', async () => {
  let calls=0, view;
@@ -478,7 +484,7 @@ test('history reviews cancelled records without restarting sessions and handles 
  b.history=async (_id,page)=>{pages.push(page);return {results:[{...entry,sessionId:'s'+page}],nextPage:page===1?2:null};};
  b.createSession=async()=>{starts++;throw Error('must not start');};
  b.historyDetail=async()=>({...entry,review:[{question:{id:'q',prompt:'Name?',direction:'image-to-name',media:{kind:'image',path:'/api/media/frog.jpg'}},answer:'frog',feedback:{correctAnswers:['frog']}}]});
- let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'history',isDeveloper:false,onBack:()=>{},onPractice:()=>{}}));});
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'history',courseId:'c1',isDeveloper:false,onBack:()=>{},onPractice:()=>{}}));});
  await act(async()=>button(view,'More').props.onClick());assert.deepEqual(pages,[1,2]);
  await act(async()=>button(view,'Review answers').props.onClick());const content=JSON.stringify(view.toJSON());
  assert.match(content,/Cancelled/);assert.doesNotMatch(content,/Score 0/);assert.match(content,/frog/);assert.equal(view.root.findByType('img').props.src,'/api/media/frog.jpg');assert.equal(starts,0);view.unmount();
@@ -487,7 +493,7 @@ test('difficulties require rejoin and ignore an enrollment completing after navi
  mod.resetBackend();const b=await mod.getBackend();let complete,practice=0;
  b.difficulties=async()=>[{course:{...course,status:'published'},items:[{objectId:'x',name:'Frog'}]}];
  b.enrollCourse=()=>new Promise(resolve=>complete=resolve);
- let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',isDeveloper:false,onBack:()=>{},onPractice:()=>practice++}));});
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',courseId:'c1',isDeveloper:false,onBack:()=>{},onPractice:()=>practice++}));});
  await act(async()=>button(view,'Rejoin course').props.onClick());assert.equal(practice,0);
  await act(async()=>view.unmount());await act(async()=>complete(course));assert.equal(practice,0);
 });
@@ -502,10 +508,38 @@ test('difficult-only setup preserves options with no questions and forwards filt
 test('records load failures are visible and retry; unpublished content cannot be practiced',async()=>{
  mod.setLocale('en');mod.resetBackend();const b=await mod.getBackend();let fail=true;
  b.difficulties=async()=>{if(fail)throw Error('offline');return [{course:{...course,status:'draft'},items:[{objectId:'x',name:'Frog'}]}];};
- let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',isDeveloper:false,onBack:()=>{},onPractice:()=>assert.fail('must not practice')}));});
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',courseId:'c1',isDeveloper:false,onBack:()=>{},onPractice:()=>assert.fail('must not practice')}));});
  assert.equal(view.root.findAllByProps({role:'alert'}).length,1);fail=false;await act(async()=>button(view,'Retry').props.onClick());
  assert.match(JSON.stringify(view.toJSON()),/Course unpublished/);assert.equal(button(view,'Practice'),undefined);assert.equal(button(view,'Rejoin course'),undefined);view.unmount();
 });
 test('history and difficulty navigation translates in every locale',async()=>{
- for(const locale of ['zh-CN','en','pl','ru','ar']){mod.setLocale(locale);let view;await act(async()=>{view=Renderer.create(React.createElement(mod.TopBar,{user:{username:'admin',isDeveloper:true},onNavigate:()=>{},onLogout:()=>{}}));});const nav=view.root.findByType('nav');assert.equal(nav.findAllByType('button').length,3);for(const b of nav.findAllByType('button'))assert.ok(b.children.join('').length>0);assert.doesNotMatch(JSON.stringify(view.toJSON()),/nav\.history|nav\.difficulties/);view.unmount();}mod.setLocale('en');
+ for(const locale of ['zh-CN','en','pl','ru','ar']){mod.setLocale(locale);let view;await act(async()=>{view=Renderer.create(React.createElement(mod.TopBar,{user:{username:'admin',isDeveloper:true},onNavigate:()=>{},onLogout:()=>{}}));});const nav=view.root.findByType('nav');assert.equal(nav.findAllByType('button').length,1);for(const b of nav.findAllByType('button'))assert.ok(b.children.join('').length>0);assert.doesNotMatch(JSON.stringify(view.toJSON()),/nav\.history|nav\.difficulties/);view.unmount();}mod.setLocale('en');
+});
+test('course context translates five tabs and retains title with zero records',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();b.courseRecords=async id=>({course:{...course,courseVersionId:id},learningHistoryCount:0,testHistoryCount:0,difficultyCount:0,canStudy:true});
+ for(const locale of ['zh-CN','en','pl','ru','ar']){mod.setLocale(locale);let view,tab;await act(async()=>{view=Renderer.create(React.createElement(mod.CourseNav,{id:'c1',tab:'learning-history',onTab:t=>tab=t,onBack:()=>{},children:()=>React.createElement('p',null,'empty')}));});assert.match(JSON.stringify(view.toJSON()),/Vocabulary/);const tabs=view.root.findAllByProps({className:'nav-link'});assert.equal(tabs.length,5);assert.equal(tabs[2].props['aria-current'],'page');assert.equal(view.root.findAllByType('small').length,3);act(()=>tabs[3].props.onClick());assert.equal(tab,'test-history');assert.doesNotMatch(JSON.stringify(view.toJSON()),/nav\.learningHistory|nav\.testHistory/);view.unmount();}mod.setLocale('en');
+});
+test('course metadata failure cannot render stale or foreign course children',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();let view,calls=0;b.courseRecords=async()=>({course:{...course,courseVersionId:'other'},canStudy:true});await act(async()=>{view=Renderer.create(React.createElement(mod.CourseNav,{id:'c1',tab:'learn',onTab:()=>{},onBack:()=>{},children:()=>{calls++;return 'wrong';}}));});assert.equal(calls,0);assert.equal(view.root.findAllByProps({role:'alert'}).length,1);view.unmount();
+});
+test('history requests exact course and mode, scopes pagination and rejects foreign replay',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();let calls=[],view;const entry={sessionId:'s1',courseVersionId:'c1',title:'Vocabulary',mode:'T',status:'finished',totalScore:1,createdAt:'2026-10-19',progress:{completed:1,total:1}};
+ b.history=async(id,page,mode)=>{calls.push([id,page,mode]);return {results:[entry,{...entry,sessionId:'foreign',courseVersionId:'other'}],nextPage:page===1?2:null};};b.historyDetail=async()=>({...entry,courseVersionId:'other',review:[]});await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'history',mode:'T',courseId:'c1',isDeveloper:false,onBack:()=>{},onPractice:()=>{}}));});assert.equal(view.root.findAllByProps({className:'record-card'}).length,1);await act(async()=>button(view,'More').props.onClick());assert.deepEqual(calls,[['c1',1,'T'],['c1',2,'T']]);await act(async()=>button(view,'Review answers').props.onClick());assert.equal(view.root.findAllByProps({role:'alert'}).length,1);view.unmount();
+});
+test('replay is read only with previous next selector and return to list',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();const entry={sessionId:'s1',courseVersionId:'c1',title:'Vocabulary',mode:'L',status:'finished',totalScore:null,createdAt:'2026-10-19',progress:{completed:2,total:2}};b.history=async()=>({results:[entry],nextPage:null});b.historyDetail=async()=>({...entry,review:['First','Second'].map(prompt=>({question:{id:prompt,prompt,direction:'name-to-property'},answer:'a',feedback:{correctAnswers:['b']}}))});b.answer=b.createSession=()=>assert.fail('replay must not write');let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'history',courseId:'c1',isDeveloper:false,onBack:()=>{},onPractice:()=>{}}));});await act(async()=>button(view,'Review answers').props.onClick());assert.match(JSON.stringify(view.toJSON()),/First/);assert.doesNotMatch(JSON.stringify(view.toJSON()),/Second/);assert.equal(button(view,'Previous question').props.disabled,true);act(()=>button(view,'Next question').props.onClick());assert.match(JSON.stringify(view.toJSON()),/Second/);assert.equal(button(view,'Next question').props.disabled,true);act(()=>view.root.findByType('select').props.onChange({target:{value:'0'}}));assert.match(JSON.stringify(view.toJSON()),/First/);await act(async()=>button(view,'Back to list').props.onClick());assert.ok(button(view,'Review answers'));view.unmount();
+});
+test('archives remain accessible after withdrawal without empty-course message',async()=>{
+ let view,selected;await act(async()=>{view=Renderer.create(React.createElement(mod.CourseListPage,{view:'my-courses',courses:[],archives:[course],onEnter:()=>{},onEnroll:()=>{},onRecords:id=>selected=id}));});assert.match(JSON.stringify(view.toJSON()),/Past courses/);act(()=>button(view,'View records').props.onClick());assert.equal(selected,'c1');assert.equal(view.root.findAllByType('p').length,0);view.unmount();
+});
+test('archived course context disables studying but keeps record tabs usable',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();b.courseRecords=async()=>({course,canStudy:false,learningHistoryCount:1,testHistoryCount:0,difficultyCount:1});let view;await act(async()=>{view=Renderer.create(React.createElement(mod.CourseNav,{id:'c1',tab:'learning-history',onTab:()=>{},onBack:()=>{},children:()=>React.createElement('p',null,'records')}));});const tabs=view.root.findAllByProps({className:'nav-link'});assert.equal(tabs[0].props.disabled,true);assert.equal(tabs[1].props.disabled,true);assert.equal(tabs[2].props.disabled,false);assert.match(JSON.stringify(view.toJSON()),/Vocabulary/);view.unmount();
+});
+test('history API never sends unscoped queries',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();let requests=[];globalThis.fetch=async path=>{requests.push(path);return {ok:true,status:200,json:async()=>({results:[],nextPage:null})};};await assert.rejects(()=>b.history(undefined));await assert.rejects(()=>b.difficulties(undefined));assert.equal(requests.length,0);await b.history('a/b@1',2,'T');assert.equal(requests[0],'/api/history/?page=2&courseVersionId=a%2Fb%401&mode=T');
+});
+test('course navigation preserves settings and temporary practice leaves prior test mode intact',async()=>{
+ mod.setLocale('en');const user={username:'admin',isDeveloper:true};mod.saveAuth('token-admin',user);mod.resetBackend();const b=await mod.getBackend();b.me=async()=>user;b.listDeveloperCourses=async()=>[course];b.courseRecords=async id=>({course:{...course,courseVersionId:id},canStudy:true,learningHistoryCount:0,testHistoryCount:0,difficultyCount:1});b.courseSetup=async()=>setup;b.history=async()=>({results:[],nextPage:null});b.difficulties=async()=>[{course,items:[{objectId:'x',name:'Frog',consecutiveCorrect:1}]}];window.location.hash='#/course/c1/test';let view;await act(async()=>{view=Renderer.create(React.createElement(mod.App));});assert.equal(view.root.findByType(mod.CourseSetupPage).props.forcedMode,'T');await act(async()=>view.root.findByProps({type:'number'}).props.onChange({target:{value:'7'}}));
+ await act(async()=>view.root.findByType(mod.CourseNav).props.onTab('difficulties'));assert.match(JSON.stringify(view.toJSON()),/Recovery 1\/2/);await act(async()=>view.root.findByType(mod.RecordsPage).props.onPractice('c1'));assert.equal(view.root.findByType(mod.CourseSetupPage).props.forcedMode,'L');assert.equal(view.root.findByType(mod.CourseSetupPage).props.initial.quantity,'7');assert.equal(view.root.findByType(mod.CourseSetupPage).props.initial.config.difficultOnly,true);
+ await act(async()=>view.root.findByType(mod.CourseNav).props.onTab('test-history'));await act(async()=>view.root.findByType(mod.RecordsPage).props.onBack());assert.equal(view.root.findByType(mod.CourseSetupPage).props.forcedMode,'T');assert.equal(view.root.findByType(mod.CourseSetupPage).props.initial.quantity,'7');view.unmount();
 });

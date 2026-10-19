@@ -99,9 +99,11 @@ export interface BackendApi {
   unpublishCourse(id: string): Promise<CourseSummary>;
   courseSetup(id: string, config: SetupConfig): Promise<CourseSetup>;
   unenrollCourse(id: string): Promise<CourseSummary>;
-  history(courseVersionId?: string, page?: number): Promise<HistoryPage>;
+  courseRecords(id:string): Promise<CourseRecords>;
+  recordCourses(): Promise<readonly CourseSummary[]>;
+  history(courseVersionId: string, page?: number, mode?: "L"|"T"): Promise<HistoryPage>;
   historyDetail(id: string): Promise<RuntimeSnapshot>;
-  difficulties(courseVersionId?: string): Promise<readonly DifficultyGroup[]>;
+  difficulties(courseVersionId: string): Promise<readonly DifficultyGroup[]>;
   enrollCourse(id: string): Promise<CourseSummary>;
   listCourses(): Promise<readonly CourseSummary[]>;
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
@@ -146,3 +148,5 @@ export interface CourseSetup {
 export interface HistoryEntry {sessionId:string; courseVersionId:string; title:string; mode:"L"|"T"; status:"finished"|"skipped"|"cancelled"; isPreview:boolean; totalScore:number|null; createdAt:string; updatedAt:string; progress:{total:number;completed:number;remaining:number}}
 export interface HistoryPage {results:readonly HistoryEntry[]; nextPage:number|null}
 export interface DifficultyGroup {course:CourseSummary; items:readonly {objectId:string;name:string;consecutiveCorrect:number;lastPracticedAt:string}[]}
+
+export interface CourseRecords {course:CourseSummary; learningHistoryCount:number; testHistoryCount:number; difficultyCount:number; canStudy:boolean}

@@ -2,13 +2,15 @@ import {useState} from "react";
 import type { CourseSummary } from "../orchestrator/types";
 import { useT } from "../i18n";
 export function CourseListPage({
-  courses,
+  courses, archives=[], onRecords,
   disabled,
   view,
   onEnter,
   onEnroll,
   onUnenroll,
 }: {
+  readonly archives?: readonly CourseSummary[];
+  readonly onRecords?:(id:string)=>void;
   readonly courses: readonly CourseSummary[];
   readonly disabled?: boolean;
   readonly view: "courses" | "my-courses";
@@ -55,7 +57,8 @@ export function CourseListPage({
               </article>
             ))}
           </div>
-          {courses.length === 0 && <p>{t("courses.empty")}</p>}
+          {view === "my-courses" && archives.length>0 && <><h2>{t("courses.past")}</h2><div className="course-grid">{archives.map(course=><article className="course-card" key={course.courseVersionId}><div className="course-copy"><h3 dir="auto">{course.title}</h3><button className="metal-button" disabled={disabled} onClick={()=>onRecords?.(course.courseVersionId)}>{t("courses.records")}</button></div></article>)}</div></>}
+          {courses.length === 0 && archives.length === 0 && <p>{t("courses.empty")}</p>}
         </div>
       </section>
     </div>

@@ -6,8 +6,8 @@ import { translate, type MessageKey } from "@znawca/core/localization";
 import { useLocale, useT } from "../i18n";
 
 export interface SetupPreferences { config: SetupConfig; mode: "L" | "T"; all: boolean; quantity: string }
-export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPreferences, onRecords}: {
-  id: string; disabled?: boolean; initial?: SetupPreferences; onPreferences?: (value: SetupPreferences) => void;
+export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPreferences, onRecords, embedded, forcedMode}: {
+  embedded?:boolean; forcedMode?:"L"|"T"; id: string; disabled?: boolean; initial?: SetupPreferences; onPreferences?: (value: SetupPreferences) => void;
   onStart: (mode: "L" | "T", title: string, config: Omit<CreateSessionRequest, "courseVersionId" | "mode" | "preview">) => void;
   onBack: () => void; onRecords?: (page:"history"|"difficulties") => void;
 }) {
@@ -20,7 +20,8 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [mode, setMode] = useState<"L" | "T">(initial?.mode ?? "L");
+  const [mode, setMode] = useState<"L" | "T">(forcedMode ?? initial?.mode ?? "L");
+  useEffect(()=>{if(forcedMode)setMode(forcedMode);},[forcedMode]);
   const [all, setAll] = useState(initial?.all ?? false);
   const [quantity, setQuantity] = useState(initial?.quantity ?? "10");
   useEffect(() => { onPreferences?.({config, mode, all, quantity}); }, [config, mode, all, quantity]);
@@ -49,15 +50,15 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
   const limit = Math.min(max, 1000);
   const valid = all || (Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= limit);
   return <div className="workspace"><section className="content course-setup">
-    <button className="metal-button" onClick={onBack}>{t("setup.back")}</button>
+    {!embedded&&<button className="metal-button" onClick={onBack}>{t("setup.back")}</button>}
     {onRecords && <div className="course-actions"><button className="metal-button" onClick={()=>onRecords("history")}>{t("nav.history")}</button><button className="metal-button" onClick={()=>onRecords("difficulties")}>{t("nav.difficulties")}</button></div>}
-    {metadata && <h1 dir="auto">{metadata.course.title}</h1>}
+    {!embedded && metadata && <h1 dir="auto">{metadata.course.title}</h1>}
     {loading && <p role="status">{t("page.loading")}</p>}
     {failed && <div role="alert"><p>{t("error.loadFailed")}</p><button className="metal-button" onClick={() => setRetry(n => n + 1)}>{t("error.retry")}</button></div>}
     {choices && <>
-      <fieldset disabled={disabled || loading}><legend>{t("setup.mode")}</legend>
+      {!embedded&&<fieldset disabled={disabled || loading}><legend>{t("setup.mode")}</legend>
         {(["L", "T"] as const).map(value => <label key={value}><input type="radio" name="mode" checked={mode === value} onChange={() => setMode(value)}/>{t(value === "L" ? "courses.learn" : "courses.test")}</label>)}
-      </fieldset>
+      </fieldset>}
       <fieldset disabled={disabled || loading}><legend>{t("setup.scope")}</legend>
         <label><input type="radio" name="scope" checked={!all} onChange={() => setAll(false)}/>{t("setup.sample")}</label>
         <label><input type="radio" name="scope" checked={all} onChange={() => setAll(true)}/>{t("setup.all")}</label>

@@ -2,6 +2,7 @@
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 from rest_framework.response import Response
@@ -14,6 +15,58 @@ from .views import AuthenticatedView, record
 
 def scoped_sessions(user):
     return Session.objects.filter(user=user, is_preview=user.is_staff)
+
+
+def closed_sessions(user):
+    return scoped_sessions(user).filter(status__in=["finished", "skipped", "cancelled"])
+
+
+class CourseRecordsView(AuthenticatedView):
+    def get(self, request, course_version_id):
+        course = get_object_or_404(CourseVersion, pk=course_version_id)
+        enrolled = Enrollment.objects.filter(
+            user=request.user, course_version=course
+        ).exists()
+        owned = scoped_sessions(request.user).filter(course_version=course)
+        if (
+            not request.user.is_staff
+            and course.status != "published"
+            and not enrolled
+            and not owned.exists()
+        ):
+            raise NotFound("Course not found.")
+        counts = {
+            row["mode"]: row["total"]
+            for row in closed_sessions(request.user)
+            .filter(course_version=course)
+            .values("mode")
+            .annotate(total=Count("id"))
+        }
+        return Response(
+            {
+                "course": course_summary(course, enrolled),
+                "learningHistoryCount": counts.get("L", 0),
+                "testHistoryCount": counts.get("T", 0),
+                "difficultyCount": len(difficult_objects(request.user, course.pk)),
+                "canStudy": request.user.is_staff
+                or (course.status == "published" and enrolled),
+            }
+        )
+
+
+class RecordCoursesView(AuthenticatedView):
+    def get(self, request):
+        courses = CourseVersion.objects.filter(
+            pk__in=closed_sessions(request.user).values("course_version_id")
+        ).order_by("title", "course_version_id")
+        enrolled = set(
+            Enrollment.objects.filter(user=request.user).values_list(
+                "course_version_id", flat=True
+            )
+        )
+        return Response(
+            [course_summary(course, course.pk in enrolled) for course in courses]
+        )
 
 
 def difficult_objects(user, course_version_id=None):
@@ -92,6 +145,11 @@ class HistoryView(AuthenticatedView):
         course_id = request.query_params.get("courseVersionId")
         if course_id is not None:
             sessions = sessions.filter(course_version_id=course_id)
+        mode = request.query_params.get("mode")
+        if mode is not None:
+            if mode not in ("L", "T"):
+                raise ValidationError("mode must be L or T.")
+            sessions = sessions.filter(mode=mode)
         sessions = list(
             sessions.order_by("-updated_at", "-id")[(page - 1) * 50 : page * 50 + 1]
         )

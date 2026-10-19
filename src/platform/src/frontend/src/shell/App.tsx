@@ -7,7 +7,7 @@ import {
 } from "../orchestrator/api";
 import { clearAuth, getStoredUser, getToken } from "../orchestrator/auth";
 import { enterCourse, type ActiveActivity } from "../orchestrator/session";
-import { roleRoute, courseRoute, recordsCourse, type PageRoute } from "../orchestrator/routes";
+import { roleRoute, courseRoute, courseTab, courseHash, legacyCourseHash, type CourseTab, type PageRoute } from "../orchestrator/routes";
 import {
   ApiError,
   type AuthUser,
@@ -20,6 +20,7 @@ import { CourseSetupPage, type SetupPreferences } from "./CourseSetupPage";
 import { CourseListPage } from "./CourseListPage";
 import { LoginPage } from "./LoginPage";
 import { DeveloperPage } from "./DeveloperPage";
+import { CourseNav } from "./CourseNav";
 import { RecordsPage } from "./RecordsPage";
 import { TopBar } from "./TopBar";
 import { textDirection, useLocale, useT, type ShellKey } from "../i18n";
@@ -32,12 +33,14 @@ export function App() {
   const [hash, setHash] = useState(() => window.location.hash);
   const [activity, setActivity] = useState<ActiveActivity | null>(null);
   const [courses, setCourses] = useState<readonly CourseSummary[]>([]);
+  const [archives,setArchives]=useState<readonly CourseSummary[]>([]);
   const [failure, setFailure] = useState<ShellKey | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const backendRef = useRef<BackendApi | null>(null);
   const lock = useRef(false);
   const setupPreferences = useRef<Record<string, SetupPreferences>>({});
+  const practiceMode = useRef<string|null>(null);
   const generation = useRef(0);
   const identity = useRef(0);
   const navigation = useRef(0);
@@ -52,7 +55,7 @@ export function App() {
   const routedHash = useRef(hash);
   routedHash.current = hash;
   const courseId = courseRoute(hash);
-  const recordCourseId = recordsCourse(hash);
+  const tab = courseTab(hash);
   const route = user ? roleRoute(user, hash) : "courses";
   useEffect(() => {
     document.documentElement.dir = textDirection(locale);
@@ -90,8 +93,10 @@ export function App() {
     resetBackend();
     backendRef.current = null;
     setupPreferences.current = {};
+    practiceMode.current=null;
     setUser(null);
     setCourses([]);
+    setArchives([]);
     setActivity(null);
     setFailure(null);
   }, []);
@@ -119,10 +124,10 @@ export function App() {
       .catch(() => undefined);
   }, [user?.username]);
   useEffect(() => {
-    if (user && !courseId && route !== "history" && route !== "difficulties" && hash !== `#/${route}`) {
-      window.history.replaceState(null, "", `#/${route}`);
-      setHash(`#/${route}`);
-    }
+    if (!user) return;
+    const legacy=legacyCourseHash(hash);
+    const target=legacy??(!courseId?`#/${route}`:null);
+    if(target&&target!==hash){window.history.replaceState(null,"",target);setHash(target);}
   }, [user, hash, route, courseId]);
   const refresh = useCallback(async () => {
     if (!user || currentUser.current?.username !== user.username) return;
@@ -143,7 +148,9 @@ export function App() {
         : route === "my-courses"
           ? backend.listMyCourses()
           : backend.listCourses());
+      const archived = !user.isDeveloper && route === "my-courses" ? await backend.recordCourses() : [];
       if (isCurrent()) {
+        setArchives(archived.filter(c=>!list.some(item=>item.courseVersionId===c.courseVersionId)));
         setCourses(list);
         setFailure(null);
       }
@@ -184,17 +191,13 @@ export function App() {
       }
     }
   };
-  const openRecords = (target:"history"|"difficulties", id?:string) => {
+  const openTab = (id:string, targetTab:CourseTab) => {
+    if(targetTab==="learn"||targetTab==="test")practiceMode.current=null;
     invalidateNavigation();setActivity(null);setFailure(null);
-    const next = `#/${target}${id ? `?course=${encodeURIComponent(id)}` : ""}`;
-    routedHash.current=next;window.location.hash=next;setHash(next);
+    const target=courseHash(id,targetTab);routedHash.current=target;window.location.hash=target;setHash(target);
   };
-  const practice = (id:string) => {setupPreferences.current[id]={config:{difficultOnly:true},mode:"L",all:false,quantity:"10"};openSetup(id);};
-  const openSetup = (id: string) => {
-    invalidateNavigation(); setActivity(null); setFailure(null);
-    const target = `#/course/${encodeURIComponent(id)}`;
-    routedHash.current = target; window.location.hash = target; setHash(target);
-  };
+  const openSetup = (id:string) => openTab(id,setupPreferences.current[id]?.mode==="T"?"test":"learn");
+  const practice = (id:string) => {const saved=setupPreferences.current[id];setupPreferences.current[id]={config:{...saved?.config,difficultOnly:true},mode:saved?.mode??"L",all:saved?.all??false,quantity:saved?.quantity??"10"};openTab(id,"learn");practiceMode.current=id;};
   const open = (id: string, mode: "L" | "T", title: string, config: Omit<CreateSessionRequest, "courseVersionId" | "mode" | "preview">) =>
     void action(
       async (isCurrent) => {
@@ -286,7 +289,7 @@ export function App() {
           {t("page.loading")}
         </p>
       )}
-      {courseId ? <CourseSetupPage key={`${user.username}:${courseId}`} id={courseId} initial={setupPreferences.current[courseId]} onRecords={page=>openRecords(page,courseId)} onPreferences={value => {setupPreferences.current[courseId] = value;}} disabled={busy} onBack={() => navigate(user.isDeveloper ? "developer" : "my-courses")} onStart={(mode, title, config) => open(courseId, mode, title, config)}/> : route === "history" || route === "difficulties" ? <RecordsPage key={`${user.username}:${route}:${recordCourseId??""}`} kind={route} courseId={recordCourseId} isDeveloper={user.isDeveloper} onPractice={practice} onBack={()=>recordCourseId ? openSetup(recordCourseId) : navigate(user.isDeveloper?"developer":"my-courses")}/> : route === "developer" ? (
+      {courseId ? <CourseNav key={`${user.username}:${courseId}`} id={courseId} tab={tab} onTab={next=>openTab(courseId,next)} onBack={()=>navigate(user.isDeveloper?"developer":"my-courses")}>{records=>tab==="learn"||tab==="test" ? <CourseSetupPage key={`${courseId}:${tab}`} embedded forcedMode={tab==="test"?"T":"L"} id={courseId} initial={setupPreferences.current[courseId]} onPreferences={value=>{setupPreferences.current[courseId]={...value,mode:practiceMode.current===courseId?(setupPreferences.current[courseId]?.mode??value.mode):value.mode};}} disabled={busy} onBack={()=>navigate(user.isDeveloper?"developer":"my-courses")} onStart={(mode,title,config)=>open(courseId,mode,title,config)}/> : <RecordsPage key={`${courseId}:${tab}`} kind={tab==="difficulties"?"difficulties":"history"} mode={tab==="test-history"?"T":"L"} courseId={courseId} isDeveloper={user.isDeveloper} embedded course={records.course} onPractice={practice} onBack={()=>openSetup(courseId)}/>}</CourseNav> : route === "developer" ? (
         <DeveloperPage
           isDeveloper={user.isDeveloper}
           courses={courses}
@@ -311,6 +314,8 @@ export function App() {
       ) : (
         <CourseListPage
           view={route}
+          archives={archives}
+          onRecords={id=>openTab(id,"learning-history")}
           courses={courses}
           disabled={busy || loading}
           onEnter={openSetup}

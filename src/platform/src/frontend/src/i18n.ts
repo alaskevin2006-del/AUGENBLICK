@@ -11,6 +11,16 @@ export { textDirection };
 const STORAGE_KEY = "augenblick.ui.locale";
 
 const zhCN = {
+  "nav.learningHistory": "学习历史",
+  "nav.testHistory": "测试历史",
+  "courses.past": "过往课程",
+  "courses.records": "查看记录",
+  "replay.previous": "上一题",
+  "replay.next": "下一题",
+  "replay.question": "题目",
+  "replay.back": "返回列表",
+  "difficulties.recovery": "恢复进度 {count}/2",
+
   "nav.history": "历史",
   "nav.difficulties": "困难内容",
   "courses.withdraw": "退课",
@@ -147,6 +157,16 @@ export type ShellKey = keyof typeof zhCN;
 type ShellMessages = Record<ShellKey, string>;
 
 const en: ShellMessages = {
+  "nav.learningHistory": "Learning history",
+  "nav.testHistory": "Test history",
+  "courses.past": "Past courses",
+  "courses.records": "View records",
+  "replay.previous": "Previous question",
+  "replay.next": "Next question",
+  "replay.question": "Question",
+  "replay.back": "Back to list",
+  "difficulties.recovery": "Recovery {count}/2",
+
   "nav.history": "History",
   "nav.difficulties": "Difficult content",
   "courses.withdraw": "Withdraw",
@@ -280,6 +300,16 @@ const en: ShellMessages = {
 };
 
 const pl: ShellMessages = {
+  "nav.learningHistory": "Historia nauki",
+  "nav.testHistory": "Historia testów",
+  "courses.past": "Poprzednie kursy",
+  "courses.records": "Zobacz historię",
+  "replay.previous": "Poprzednie pytanie",
+  "replay.next": "Następne pytanie",
+  "replay.question": "Pytanie",
+  "replay.back": "Powrót do listy",
+  "difficulties.recovery": "Postęp {count}/2",
+
   "nav.history": "Historia",
   "nav.difficulties": "Trudne treści",
   "courses.withdraw": "Wypisz się",
@@ -413,6 +443,16 @@ const pl: ShellMessages = {
 };
 
 const ru: ShellMessages = {
+  "nav.learningHistory": "История обучения",
+  "nav.testHistory": "История тестов",
+  "courses.past": "Прошлые курсы",
+  "courses.records": "Посмотреть историю",
+  "replay.previous": "Предыдущий вопрос",
+  "replay.next": "Следующий вопрос",
+  "replay.question": "Вопрос",
+  "replay.back": "Назад к списку",
+  "difficulties.recovery": "Прогресс {count}/2",
+
   "nav.history": "История",
   "nav.difficulties": "Трудный материал",
   "courses.withdraw": "Покинуть курс",
@@ -545,6 +585,16 @@ const ru: ShellMessages = {
 };
 
 const ar: ShellMessages = {
+  "nav.learningHistory": "سجل التعلم",
+  "nav.testHistory": "سجل الاختبارات",
+  "courses.past": "الدورات السابقة",
+  "courses.records": "عرض السجلات",
+  "replay.previous": "السؤال السابق",
+  "replay.next": "السؤال التالي",
+  "replay.question": "السؤال",
+  "replay.back": "العودة إلى القائمة",
+  "difficulties.recovery": "التقدم {count}/2",
+
   "nav.history": "السجل",
   "nav.difficulties": "المحتوى الصعب",
   "courses.withdraw": "الانسحاب",

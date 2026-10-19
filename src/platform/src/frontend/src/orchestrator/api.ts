@@ -6,6 +6,7 @@ import {
   type HistoryPage,
   type DifficultyGroup,
   type CourseSetup,
+  type CourseRecords,
   type SetupConfig,
   type BackendApi,
   type CourseSummary,
@@ -95,9 +96,11 @@ class HttpBackend implements BackendApi {
     return request(`/api/courses/${encodeURIComponent(id)}/setup/`, {method: "POST", body: JSON.stringify(config)});
   }
   unenrollCourse(id: string): Promise<CourseSummary> {return request(`/api/courses/${encodeURIComponent(id)}/unenroll/`, {method:"POST"});}
-  history(courseVersionId?:string, page=1):Promise<HistoryPage> {return request(`/api/history/?page=${page}${courseVersionId ? `&courseVersionId=${encodeURIComponent(courseVersionId)}` : ""}`);}
+  courseRecords(id:string):Promise<CourseRecords>{return request(`/api/courses/${encodeURIComponent(id)}/records/`);}
+  recordCourses():Promise<readonly CourseSummary[]>{return request("/api/record-courses/");}
+  history(courseVersionId:string, page=1,mode?:"L"|"T"):Promise<HistoryPage> {if(!courseVersionId) return Promise.reject(new Error("Course required"));return request(`/api/history/?page=${page}&courseVersionId=${encodeURIComponent(courseVersionId)}${mode?`&mode=${mode}`:""}`);}
   historyDetail(id:string):Promise<RuntimeSnapshot> {return request(`/api/history/${encodeURIComponent(id)}/`);}
-  difficulties(courseVersionId?:string):Promise<readonly DifficultyGroup[]> {return request(`/api/difficulties/${courseVersionId ? `?courseVersionId=${encodeURIComponent(courseVersionId)}` : ""}`);}
+  difficulties(courseVersionId:string):Promise<readonly DifficultyGroup[]> {if(!courseVersionId)return Promise.reject(new Error("Course required"));return request(`/api/difficulties/?courseVersionId=${encodeURIComponent(courseVersionId)}`);}
   enrollCourse(id: string): Promise<CourseSummary> {
     return request(`/api/courses/${encodeURIComponent(id)}/enroll/`, {
       method: "POST",

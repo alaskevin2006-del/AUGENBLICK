@@ -36,6 +36,6 @@
 
 ## 在线试点（2026-10-19）
 
-- [打开 AUGENBLICK](https://124.221.230.69:18443/)：当前为 Znawca 学习/测试试点，已具备独立开发者页、草稿预览/发布、选择课程/我的课程与五种界面语言；完整平台及其他引擎仍在后续范围。
-- [最新交付与验收](docs/releases/2026-10-19-role-pages.md) · [首次上线记录](docs/releases/2026-10-19-pilot.md) · [部署与回滚](src/platform/deploy/README.md) · [全局进度](docs/进度.md)。
+- [打开 AUGENBLICK](https://124.221.230.69:18443/)：当前为 Znawca 学习/测试试点，包含独立开发者页、草稿预览、发布/下架、选择课程/我的课程、共同课程设置与分批练习，保留五种界面语言；完整平台及其他引擎仍在后续范围。
+- [最新交付与验收](docs/releases/2026-10-19-course-setup.md) · [角色页面及上传修复](docs/releases/2026-10-19-role-pages.md) · [首次上线记录](docs/releases/2026-10-19-pilot.md) · [部署与回滚](src/platform/deploy/README.md) · [全局进度](docs/进度.md)。
 - 开发者和普通用户账号凭证仅在本机 `AUGENBLICK-access.local` 保存，不进入仓库。

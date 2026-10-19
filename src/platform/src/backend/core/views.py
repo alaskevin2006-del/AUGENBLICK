@@ -1,168 +1,312 @@
 import random
+import time
+import uuid
 
+from django.contrib.auth import get_user_model
+from django.db import transaction, connection, DatabaseError
 from django.shortcuts import get_object_or_404
-from rest_framework import status as http
+from rest_framework.exceptions import APIException, ValidationError, PermissionDenied
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CourseVersion, Event, Session
+from .models import CourseVersion, Event, Session, Submission
+from .runtime import build_questions, initial_state, public_question, snapshot
+from .scoring import evaluate
 
-EVENT_TYPES = {"activityReady", "itemStarted", "itemResolved", "activityFinished"}
+
+class Conflict(APIException):
+    status_code = 409
+    default_detail = "Activity state changed. Refresh and try again."
 
 
-class CourseListView(APIView):
-    """GET /api/courses/ —— 课程版本列表。"""
+class AuthenticatedView(APIView):
+    permission_classes = [IsAuthenticated]
 
+
+def owned(request, session_id, lock=False):
+    qs = Session.objects.select_related("course_version").filter(user=request.user)
+    if lock:
+        qs = qs.select_for_update()
+    return get_object_or_404(qs, pk=session_id)
+
+
+def record(session, kind, payload):
+    seq = (
+        session.events.order_by("-seq").values_list("seq", flat=True).first() or 0
+    ) + 1
+    Event.objects.create(
+        event_id=uuid.uuid4(),
+        session=session,
+        seq=seq,
+        ts=int(time.time() * 1000),
+        type=kind,
+        payload=payload,
+    )
+
+
+class CourseListView(AuthenticatedView):
     def get(self, request):
-        data = [
-            {
-                "courseVersionId": c.course_version_id,
-                "title": c.title,
-                "languageCode": c.language_code,
-                "engine": c.engine,
-                "itemCount": c.item_count,
-            }
-            for c in CourseVersion.objects.order_by("course_version_id")
-        ]
-        return Response(data)
+        return Response(
+            [
+                {
+                    "courseVersionId": c.pk,
+                    "title": c.title,
+                    "languageCode": c.language_code,
+                    "engine": c.engine,
+                    "itemCount": c.item_count,
+                }
+                for c in CourseVersion.objects.order_by("course_version_id")
+            ]
+        )
 
 
-class CoursePayloadView(APIView):
-    """GET /api/courses/{courseVersionId}/payload/ —— 完整编译产物。"""
-
+class CoursePayloadView(AuthenticatedView):
     def get(self, request, course_version_id):
-        course = get_object_or_404(CourseVersion, pk=course_version_id)
-        return Response(course.payload)
+        if not request.user.is_staff:
+            raise PermissionDenied("Authoring payload is restricted to staff.")
+        return Response(get_object_or_404(CourseVersion, pk=course_version_id).payload)
 
 
-class SessionListView(APIView):
-    """GET  恢复查询（?status=&courseVersionId= 过滤，最新在前）
-    POST 创建会话。"""
-
+class SessionListView(AuthenticatedView):
     def get(self, request):
-        sessions = Session.objects.order_by("-created_at")
-        if status_q := request.query_params.get("status"):
-            sessions = sessions.filter(status=status_q)
-        if cv := request.query_params.get("courseVersionId"):
-            sessions = sessions.filter(course_version_id=cv)
-        return Response([
-            {
-                "sessionId": str(s.id),
-                "attemptId": str(s.attempt_id),
-                "randomSeed": s.random_seed,
-                "courseVersionId": s.course_version_id,
-                "mode": s.mode,
-                "status": s.status,
-                "resumeToken": s.resume_token,
-                "createdAt": s.created_at.isoformat(),
-            }
-            for s in sessions
-        ])
+        qs = (
+            Session.objects.select_related("course_version")
+            .filter(user=request.user)
+            .order_by("-created_at")
+        )
+        if request.query_params.get("status"):
+            qs = qs.filter(status=request.query_params["status"])
+        if request.query_params.get("courseVersionId"):
+            qs = qs.filter(course_version_id=request.query_params["courseVersionId"])
+        return Response([snapshot(s) for s in qs])
 
+    @transaction.atomic
     def post(self, request):
-        course = get_object_or_404(CourseVersion, pk=request.data.get("courseVersionId"))
+        # Lock the owner, including the empty-session case, to serialize start/restart.
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        course = get_object_or_404(
+            CourseVersion, pk=request.data.get("courseVersionId")
+        )
+        if course.engine != "znawca":
+            raise ValidationError("This engine is not available yet.")
         mode = request.data.get("mode")
         if mode not in ("L", "T"):
-            return Response({"detail": "mode 必须是 'L' 或 'T'。"}, status=http.HTTP_400_BAD_REQUEST)
+            raise ValidationError("mode must be L or T.")
+        sessions = Session.objects.filter(
+            user=request.user, course_version=course, mode=mode
+        )
+        if mode == "T" and sessions.filter(status="finished").exists():
+            raise Conflict("This test has already been submitted.")
+        count = request.data.get("itemCount")
+        if count is not None and (type(count) is not int or count < 1 or count > 1000):
+            raise ValidationError("itemCount must be an integer from 1 to 1000.")
+        seed = random.SystemRandom().randint(0, 2**31 - 1)
+        questions = build_questions(course.payload, seed)
+        if not questions:
+            raise ValidationError("This course has no usable questions.")
+        questions = questions[: count or min(20, len(questions))]
+        for previous in sessions.select_for_update().filter(status="active"):
+            previous.status = "cancelled"
+            previous.save(update_fields=["status", "updated_at"])
+            record(previous, "activityInterrupted", {"restart": True})
         session = Session.objects.create(
+            user=request.user,
             course_version=course,
             mode=mode,
-            random_seed=random.randint(0, 2**31 - 1),
+            random_seed=seed,
+            runtime=initial_state(questions),
         )
-        return Response(
-            {
-                "sessionId": str(session.id),
-                "attemptId": str(session.attempt_id),
-                "randomSeed": session.random_seed,
-                "resumed": False,
-            },
-            status=http.HTTP_201_CREATED,
+        record(
+            session, "activityReady", {"mode": mode, "questionCount": len(questions)}
         )
+        return Response(snapshot(session), status=201)
 
 
-class SessionDetailView(APIView):
-    """GET /api/sessions/{id}/ —— 会话状态。"""
-
+class SessionDetailView(AuthenticatedView):
     def get(self, request, session_id):
-        session = get_object_or_404(Session, pk=session_id)
-        return Response({
-            "status": session.status,
-            "mode": session.mode,
-            "totalScore": session.total_score,
-            "resumeToken": session.resume_token,
-            "eventCount": session.events.count(),
-        })
+        return Response(snapshot(owned(request, session_id)))
 
 
-class SessionEventsView(APIView):
-    """POST /api/sessions/{id}/events/ —— 推送事件批。
-    eventId 幂等去重；seq 会话内从 1 严格递增，乱序/跳号 409。"""
-
+class SessionEventsView(AuthenticatedView):
     def post(self, request, session_id):
-        session = get_object_or_404(Session, pk=session_id)
-        events = request.data.get("events")
-        if not isinstance(events, list):
-            return Response({"detail": "events 必须是数组。"}, status=http.HTTP_400_BAD_REQUEST)
+        owned(request, session_id)
+        raise ValidationError(
+            "Client-authored scoring and progress events are disabled. Submit raw answers."
+        )
 
-        accepted = 0
-        warning = None
-        last_seq = session.events.order_by("-seq").values_list("seq", flat=True).first() or 0
 
-        for raw in events:
-            event_id = raw.get("eventId")
-            seq = raw.get("seq")
-            ts = raw.get("ts")
-            etype = raw.get("type")
-            payload = raw.get("payload") or {}
-
-            # 幂等：eventId 已存在 → 跳过不报错
-            if Event.objects.filter(event_id=event_id).exists():
-                continue
-
-            if not isinstance(seq, int) or seq != last_seq + 1:
-                return Response(
-                    {"detail": f"seq 必须严格递增：期望 {last_seq + 1}，收到 {seq}。", "accepted": accepted},
-                    status=http.HTTP_409_CONFLICT,
+class SessionAnswerView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, session_id):
+        s = owned(request, session_id, lock=True)
+        try:
+            token = uuid.UUID(str(request.data.get("submissionId")))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError("submissionId must be a UUID.")
+        answer = request.data.get("answer")
+        question_id = request.data.get("questionId")
+        if (
+            not isinstance(answer, str)
+            or len(answer) > 10000
+            or not isinstance(question_id, str)
+        ):
+            raise ValidationError("A questionId and text answer are required.")
+        prior = Submission.objects.filter(session=s, submission_id=token).first()
+        if prior:
+            if prior.question_id != question_id or prior.answer != answer:
+                raise Conflict("submissionId was already used for another answer.")
+            return Response(prior.response)
+        state = s.runtime
+        if (
+            s.status != "active"
+            or state.get("feedback")
+            or not state.get("queue")
+            or state["queue"][0] != question_id
+        ):
+            raise Conflict("This question is not awaiting an answer.")
+        q = state["questions"][question_id]
+        feedback = evaluate(
+            answer,
+            q["acceptedAnswers"],
+            subscript_compatible=bool(
+                s.course_version.payload.get("answerRules", {}).get(
+                    "subscriptCompatible", False
                 )
-            if etype not in EVENT_TYPES:
-                return Response({"detail": f"未知事件类型：{etype}。", "accepted": accepted},
-                                status=http.HTTP_400_BAD_REQUEST)
-            if etype == "itemResolved":
-                score = payload.get("score")
-                if not isinstance(score, (int, float)) or not 0 <= score <= 1:
-                    return Response({"detail": "itemResolved.score 必须 ∈ [0,1]。", "accepted": accepted},
-                                    status=http.HTTP_400_BAD_REQUEST)
-            if session.status != "active":
-                return Response({"detail": f"会话已 {session.status}，拒绝新事件。", "accepted": accepted},
-                                status=http.HTTP_409_CONFLICT)
+            ),
+        )
+        feedback["submissionId"] = str(token)
+        feedback["correctAnswerLabels"] = [
+            q.get("answerLabels", {}).get(v, v) for v in feedback["correctAnswers"]
+        ]
+        if q.get("answerLabels"):
+            feedback["correctOptionValues"] = list(feedback["correctAnswers"])
+            media_paths = {o["value"]: o["media"]["path"] for o in q["options"]}
+            for key in ("correctAnswers", "matched", "missed", "extra"):
+                feedback[key] = [media_paths.get(v, v) for v in feedback[key]]
+        if s.mode == "T":
+            mastered = True
+        elif feedback["fullyCorrect"]:
+            state["streaks"][question_id] = state["streaks"].get(question_id, 0) + 1
+            mastered = (
+                question_id not in state["failed"] or state["streaks"][question_id] >= 2
+            )
+        else:
+            if question_id not in state["failed"]:
+                state["failed"].append(question_id)
+            state["streaks"][question_id] = 0
+            mastered = False
+        if mastered:
+            state["mastered"].append(question_id)
+        if question_id in state["cycleRemaining"]:
+            state["cycleRemaining"].remove(question_id)
+        if not state["cycleRemaining"]:
+            state["cycles"] += 1
+            state["cycleRemaining"] = [
+                qid for qid in state["questions"] if qid not in state["mastered"]
+            ]
+        state["feedback"] = feedback
+        state["review"].append(
+            {"question": public_question(q), "answer": answer, "feedback": feedback}
+        )
+        s.save(update_fields=["runtime", "updated_at"])
+        record(
+            s, "itemResolved", {"questionId": question_id, "answer": answer, **feedback}
+        )
+        result = snapshot(s)
+        Submission.objects.create(
+            session=s,
+            submission_id=token,
+            question_id=question_id,
+            answer=answer,
+            response=result,
+        )
+        return Response(result)
 
-            Event.objects.create(event_id=event_id, session=session, seq=seq, ts=ts, type=etype, payload=payload)
-            last_seq = seq
-            accepted += 1
 
-            if etype == "activityFinished":
-                # 后端裁决：以已收 itemResolved 的 score 均值重算权威总分
-                scores = [e.payload["score"] for e in session.events.filter(type="itemResolved")]
-                session.total_score = sum(scores) / len(scores) if scores else None
-                reported = payload.get("totalScore")
-                session.reported_total_score = reported if isinstance(reported, (int, float)) else None
-                if (session.total_score is None) != (session.reported_total_score is None) or (
-                    session.total_score is not None
-                    and abs(session.total_score - session.reported_total_score) > 1e-9
-                ):
-                    warning = (
-                        f"上报 totalScore={session.reported_total_score} 与后端权威值 "
-                        f"{session.total_score} 不一致，以后端为准。"
-                    )
-                session.status = "finished"
-                session.save()
+class SessionNextView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, session_id):
+        s = owned(request, session_id, lock=True)
+        state = s.runtime
+        if s.status != "active":
+            raise Conflict("Activity is closed.")
+        question_id = request.data.get("questionId")
+        submission_id = request.data.get("submissionId")
+        if not isinstance(question_id, str) or not isinstance(submission_id, str):
+            raise ValidationError(
+                "questionId and submissionId are required to dismiss feedback."
+            )
+        if (
+            state.get("feedback")
+            and state["queue"][0] == question_id
+            and state["feedback"].get("submissionId") == submission_id
+        ):
+            qid = state["queue"].pop(0)
+            if qid not in state["mastered"]:
+                state["queue"].append(qid)
+            state["feedback"] = None
+            s.save(update_fields=["runtime", "updated_at"])
+        return Response(snapshot(s))
 
-        # resumeToken 不透明透传，存最新值
-        if "resumeToken" in request.data:
-            session.resume_token = request.data["resumeToken"]
-            session.save(update_fields=["resume_token", "updated_at"])
 
-        body = {"accepted": accepted, "status": session.status}
-        if warning:
-            body["warning"] = warning
-        return Response(body)
+class SessionFinishView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, session_id):
+        # Same lock ordering as start: owner then session; prevents restart/finish races.
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        s = owned(request, session_id, lock=True)
+        if s.status == "finished":
+            return Response(snapshot(s))
+        if not snapshot(s)["canFinish"]:
+            raise Conflict("Answer all questions before submitting.")
+        scores = [r["feedback"]["score"] for r in s.runtime["review"]]
+        s.total_score = sum(scores) / len(scores) if s.mode == "T" else 1.0
+        s.status = "finished"
+        s.save(update_fields=["total_score", "status", "updated_at"])
+        record(
+            s,
+            "activityFinished",
+            {"totalScore": s.total_score, "attemptConsumed": s.mode == "T"},
+        )
+        return Response(snapshot(s))
+
+
+class SessionSkipView(AuthenticatedView):
+    @transaction.atomic
+    def post(self, request, session_id):
+        s = owned(request, session_id, lock=True)
+        if s.status == "skipped":
+            return Response(snapshot(s))
+        if not snapshot(s)["canSkip"]:
+            raise Conflict(
+                "Only learning activities after three cycles may be skipped."
+            )
+        s.status = "skipped"
+        s.save(update_fields=["status", "updated_at"])
+        record(
+            s,
+            "activitySkipped",
+            {
+                "unmastered": [
+                    qid
+                    for qid in s.runtime["questions"]
+                    if qid not in s.runtime["mastered"]
+                ]
+            },
+        )
+        return Response(snapshot(s))
+
+
+class HealthView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except DatabaseError:
+            return Response({"status": "unavailable"}, status=503)
+        return Response({"status": "ok"})

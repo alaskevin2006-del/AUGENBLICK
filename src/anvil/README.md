@@ -29,3 +29,9 @@
 - 无阻塞项。引擎内动作：写 `docs/adr/0001-题型语义与分型.md` 定稿题型分型 + item 粒度（B3/B4）；第三层 Excel 通用格式约定（B1）回报总控由平台统一规定。
 - 已定（不归 Anvil，见 `docs/边界.md` 基线）：账户/支付、进度/错题、编排调度/随机种子、导航/语言/RTL、内容导入/编译、判分裁决。
 - 评分 = 0/1；Anvil = 随机引擎；Znawca 代码仅可选参考。
+
+## 2026-10-19 实现入口
+
+依平台 ADR-0015 开始多引擎试运行接入；上文 v0.3 等待状态为历史上下文。实际编译/评分模块在 `../platform/src/backend/core/engines/anvil.py`，界面在 `../platform/src/frontend/src/engines/AnvilQuestion.tsx`，共用平台服务端会话。
+
+作者格式见 `docs/adr/0001-types-and-source-format.md`，直接可上传示例为 `templates/anvil-demo.zip`，生成脚本 `scripts/make_demo.py`。验证与待联调状态见进度最后一条。

@@ -1,0 +1,13 @@
+.anvil-question { display:grid; gap:1.2rem; min-width:0; }
+.anvil-stimulus, .anvil-prompt { text-align:center; overflow-wrap:anywhere; }
+.anvil-media { max-width:100%; max-height:320px; object-fit:contain; }
+.anvil-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr)); gap:.7rem; margin-block:.6rem; }
+.anvil-option { border:1px solid var(--line,#365247); padding:.8rem; display:flex; flex-direction:column; gap:.7rem; justify-content:space-between; overflow-wrap:anywhere; min-width:0; }
+.anvil-option.anvil-selected { border-color:#d4b85e; box-shadow:inset 0 0 0 1px #d4b85e; }
+.anvil-question audio { max-width:100%; min-width:0; }
+.anvil-cloze { font-size:1.1rem; line-height:1.8; }
+.anvil-blank { display:inline-block; vertical-align:middle; border:1px solid #365247; padding:.5rem; margin:.3rem; max-width:100%; }
+.anvil-blank input { display:block; max-width:100%; background:transparent; color:inherit; border:1px solid #d4b85e; padding:.6rem; }
+.anvil-blank .anvil-options { font-size:1rem; }
+.anvil-matching { display:grid; gap:1rem; }
+.anvil-matching fieldset { min-width:0; border:1px solid #365247; padding:1rem; }

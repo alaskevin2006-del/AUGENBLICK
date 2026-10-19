@@ -1,0 +1,14 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {build} from 'esbuild';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+let mod,temp;
+before(async()=>{temp=await mkdtemp(path.resolve('node_modules/.anvil-test-'));const outfile=path.join(temp,'anvil.mjs');await build({entryPoints:['src/engines/AnvilQuestion.tsx'],outfile,bundle:true,platform:'node',format:'esm',jsx:'automatic',external:['react','react/jsx-runtime'],loader:{'.css':'empty'}});mod=await import(pathToFileURL(outfile));});
+after(async()=>{await rm(temp,{recursive:true,force:true});});
+const text=value=>({kind:'text',text:value});
+test('cloze preserves other answers, Unicode input and Arabic layout',async()=>{let answer;let view;await act(async()=>{view=Renderer.create(React.createElement(mod.AnvilQuestion,{question:{kind:'anvil-5',prompt:'',interaction:{segments:[{text:'A '},{id:'0',typed:true},{id:'1',typed:false,options:[{id:'opt',content:text('Bird')}]}]}},answer:'{"1":"opt"}',onChange:value=>answer=value,disabled:false,locale:'ar'}));});await act(async()=>{view.root.findByType('input').props.onChange({target:{value:'طائر'}});});assert.deepEqual(JSON.parse(answer),{'0':'طائر','1':'opt'});assert.equal(view.root.findByType('section').props.dir,'rtl');});
+test('media choices separate playback controls from selection and readonly disables answer',async()=>{let answer;let view;await act(async()=>{view=Renderer.create(React.createElement(mod.AnvilQuestion,{question:{kind:'anvil-8',prompt:'',interaction:{options:[{id:'token',content:{kind:'media',media:{kind:'audio',path:'/media/hash.mp3'}}}]}},answer:'',onChange:value=>answer=value,disabled:false,locale:'en'}));});assert.equal(view.root.findByType('audio').props.controls,true);await act(async()=>view.root.findByType('button').props.onClick());assert.equal(answer,'token');await act(async()=>view.update(React.createElement(mod.AnvilQuestion,{question:{kind:'anvil-1',prompt:'',interaction:{options:[{id:'x',content:text('x')}]}},answer:'x',onChange:()=>{},disabled:true,locale:'zh'})));assert.equal(view.root.findByType('button').props.disabled,true);assert.equal(view.root.findByType('button').props['aria-pressed'],true);});

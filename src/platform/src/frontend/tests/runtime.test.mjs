@@ -18,7 +18,7 @@ before(async () => {
 after(async () => { await rm(temporary, {recursive:true,force:true}); });
 const question = {id:'q1',objectId:'o1',kind:'input',direction:'name-to-property',prompt:'Capital?'};
 const initial = {sessionId:'s1',courseVersionId:'c1',mode:'T',status:'active',totalScore:null,question,feedback:null,progress:{total:1,completed:0,remaining:1},canFinish:false,canSkip:false,review:[]};
-const feedback = {score:1,fullyCorrect:true,matched:['Paris'],missed:[],extra:[],correctAnswers:['Paris']};
+const feedback = {submissionId:'submission-1',score:1,fullyCorrect:true,matched:['Paris'],missed:[],extra:[],correctAnswers:['Paris']};
 const labels = {error:'Connection failed',retry:'Retry',finish:'Submit results',skip:'Skip',skipped:'Skipped',pending:'Saving'};
 const props = api => ({initialSnapshot:initial,courseTitle:'Geography',interfaceLang:'en',labels,api,onExit:()=>{}});
 const button = (view,label) => view.root.findAllByType('button').find(b=>b.children.join('')===label);
@@ -80,3 +80,15 @@ test('each supported interface locale renders and learning skip is server contro
   }
 });
 
+
+test('next retries identify the same dismissed question instead of advancing newer feedback', async () => {
+  const calls=[];
+  const api={answer:async()=>initial,advance:async(id,action,questionId,submissionId)=>{calls.push({id,action,questionId,submissionId});if(calls.length===1)throw Error('lost response');return {...initial,question:{...question,id:'q2'},progress:{total:2,completed:1,remaining:1}};}};
+  let view;
+  await act(async()=>{view=Renderer.create(React.createElement(mod.ZnawcaActivity,{...props(api),initialSnapshot:{...initial,feedback,progress:{total:2,completed:1,remaining:1}}}));});
+  await act(async()=>button(view,'Next question').props.onClick());
+  await act(async()=>button(view,'Retry').props.onClick());
+  assert.deepEqual(calls,[{id:'s1',action:'next',questionId:'q1',submissionId:'submission-1'},{id:'s1',action:'next',questionId:'q1',submissionId:'submission-1'}]);
+  assert.ok(button(view,'Check answer'));
+  view.unmount();
+});

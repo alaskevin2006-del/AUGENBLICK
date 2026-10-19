@@ -73,8 +73,8 @@ class HttpBackend implements BackendApi {
   answer(sessionId: string, body: AnswerRequest): Promise<RuntimeSnapshot> {
     return request(`/api/sessions/${encodeURIComponent(sessionId)}/answer/`, {method: "POST", body: JSON.stringify(body)});
   }
-  advance(sessionId: string, action: "next" | "finish" | "skip"): Promise<RuntimeSnapshot> {
-    return request(`/api/sessions/${encodeURIComponent(sessionId)}/${action}/`, {method: "POST"});
+  advance(sessionId: string, action: "next" | "finish" | "skip", questionId?: string, submissionId?: string): Promise<RuntimeSnapshot> {
+    return request(`/api/sessions/${encodeURIComponent(sessionId)}/${action}/`, {method: "POST", ...(action === "next" ? {body: JSON.stringify({questionId, submissionId})} : {})});
   }
 
   getSession(sessionId: string): Promise<RuntimeSnapshot> {

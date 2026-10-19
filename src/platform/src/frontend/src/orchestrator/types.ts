@@ -89,7 +89,7 @@ export interface BackendApi {
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
   createSession(request: CreateSessionRequest): Promise<RuntimeSnapshot>;
   answer(sessionId: string, request: AnswerRequest): Promise<RuntimeSnapshot>;
-  advance(sessionId: string, action: "next" | "finish" | "skip"): Promise<RuntimeSnapshot>;
+  advance(sessionId: string, action: "next" | "finish" | "skip", questionId?: string, submissionId?: string): Promise<RuntimeSnapshot>;
   getSession(sessionId: string): Promise<RuntimeSnapshot>;
   findActiveSession(courseVersionId: string): Promise<SessionInfo | null>;
   pushEvents(sessionId: string, events: readonly EngineEvent[], resumeToken?: unknown): Promise<PushEventsResponse>;

@@ -40,7 +40,7 @@ function Activity(props: ZnawcaActivityProps) {
   };
   const advance = (action: "next" | "finish" | "skip") => {
     if (command.current) return;
-    void run(() => props.api.advance(snapshot.sessionId, action));
+    void run(() => props.api.advance(snapshot.sessionId, action, snapshot.question?.id, snapshot.feedback?.submissionId));
   };
   const submit = () => {
     if (!snapshot.question || snapshot.feedback || command.current) return;

@@ -3,7 +3,7 @@ export type PublicQuestion = Omit<Question, "acceptedAnswers" | "options"> & {
   readonly speechUrls?: readonly string[];
   readonly options?: readonly (NonNullable<Question["options"]>[number] & {readonly speechUrl?: string})[];
 };
-export interface RuntimeFeedback extends AnswerEvaluation { readonly correctAnswers: readonly string[]; }
+export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; }
 export interface RuntimeSnapshot {
   readonly sessionId: string;
   readonly courseVersionId: string;
@@ -20,5 +20,5 @@ export interface RuntimeSnapshot {
 export interface AnswerRequest { readonly submissionId: string; readonly questionId: string; readonly answer: string; }
 export interface RuntimeApi {
   answer(sessionId: string, request: AnswerRequest): Promise<RuntimeSnapshot>;
-  advance(sessionId: string, action: "next" | "finish" | "skip"): Promise<RuntimeSnapshot>;
+  advance(sessionId: string, action: "next" | "finish" | "skip", questionId?: string, submissionId?: string): Promise<RuntimeSnapshot>;
 }

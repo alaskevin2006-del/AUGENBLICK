@@ -12,7 +12,7 @@ before(async () => {
   const outfile = path.join(temp, "shell.mjs");
   await build({
     stdin: {
-      contents: `export {CourseSetupPage} from './src/shell/CourseSetupPage'; export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
+      contents: `export {RecordsPage} from './src/shell/RecordsPage'; export {CourseSetupPage} from './src/shell/CourseSetupPage'; export {App} from './src/shell/App'; export {LoginPage} from './src/shell/LoginPage'; export {ActivityHost} from './src/host/ActivityHost'; export {saveAuth} from './src/orchestrator/auth'; export {TopBar} from './src/shell/TopBar'; export {DeveloperPage} from './src/shell/DeveloperPage'; export {CourseListPage} from './src/shell/CourseListPage'; export {roleRoute} from './src/orchestrator/routes'; export {validateUpload, uploadCourseFile} from './src/orchestrator/upload'; export {setLocale} from './src/i18n'; export {getBackend,resetBackend,setUnauthorizedHandler} from './src/orchestrator/api';`,
       resolveDir: process.cwd(),
       loader: "ts",
     },
@@ -395,7 +395,7 @@ test("shared setup defaults to ten; all sends null; options and quantity are for
   act(()=>button(view,"Start").props.onClick());
   assert.equal(starts[0][2].itemCount,10);
   act(()=>view.root.findByProps({type:"number"}).props.onChange({target:{value:"3"}}));
-  const checks = view.root.findAllByProps({type:"checkbox"});
+  const checks = view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly");
   await act(async()=>checks[0].props.onChange());
   assert.deepEqual(requests.at(-1).kinds,["choice"]);
   act(()=>button(view,"Start").props.onClick());
@@ -403,10 +403,10 @@ test("shared setup defaults to ten; all sends null; options and quantity are for
   act(()=>view.root.findAllByProps({name:"scope"})[1].props.onChange());
   act(()=>button(view,"Start").props.onClick());
   assert.equal(starts[2][2].itemCount,null);
-  await act(async()=>view.root.findAllByProps({type:"checkbox"})[1].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly")[1].props.onChange());
   assert.equal(button(view,"Start").props.disabled,true);
   assert.equal(view.root.findAllByType("fieldset")[2].props.disabled,false);
-  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly")[0].props.onChange());
   assert.equal(button(view,"Start").props.disabled,false);
   view.unmount();
 });
@@ -421,11 +421,11 @@ test("saved setup keeps complete choices, handles failure, caps batch, translate
     await act(async()=>mod.setLocale(locale));
     assert.ok(JSON.stringify(view.toJSON()).includes(label));
   }
-  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
-  await act(async()=>view.root.findAllByProps({type:"checkbox"})[1].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly")[0].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly")[1].props.onChange());
   assert.equal(button(view,"Start").props.disabled,true);
   assert.equal(view.root.findAllByType("fieldset")[2].props.disabled,false);
-  await act(async()=>view.root.findAllByProps({type:"checkbox"})[0].props.onChange());
+  await act(async()=>view.root.findAllByProps({type:"checkbox"}).filter(n=>n.props.name!=="difficultOnly")[0].props.onChange());
   assert.equal(button(view,"Start").props.disabled,false);
   view.unmount();
 });
@@ -458,4 +458,54 @@ test("refresh of encoded course deep link shows identical setup for either accou
     view.unmount();
   }
   assert.equal(snapshots[0],snapshots[1]);
+});
+test('history and difficulties routes stay accessible to both roles', () => {
+ for (const isDeveloper of [true,false]) {assert.equal(mod.roleRoute({isDeveloper}, '#/history?course=c1'), 'history'); assert.equal(mod.roleRoute({isDeveloper}, '#/difficulties'), 'difficulties');}
+});
+test('withdraw requires confirmation; cancel preserves enrollment', async () => {
+ let calls=0, view;
+ await act(async()=>{view=Renderer.create(React.createElement(mod.CourseListPage,{courses:[{...course,isEnrolled:true}],view:'my-courses',onEnter:()=>{},onEnroll:()=>{},onUnenroll:()=>calls++}));});
+ act(()=>button(view,'Withdraw').props.onClick());
+ assert.match(JSON.stringify(view.toJSON()),/Vocabulary/);
+ act(()=>button(view,'Cancel').props.onClick()); assert.equal(calls,0);
+ act(()=>button(view,'Withdraw').props.onClick());
+ const confirms=view.root.findAllByType('button').filter(b=>b.children.join('')==='Withdraw');
+ act(()=>view.root.findByProps({role:'dialog'}).findAllByType('button').at(-1).props.onClick()); assert.equal(calls,1); view.unmount();
+});
+test('history reviews cancelled records without restarting sessions and handles pagination', async()=>{
+ mod.setLocale('en');mod.resetBackend();const b=await mod.getBackend();let starts=0, pages=[];
+ const entry={sessionId:'s1',courseVersionId:'c1',title:'Vocabulary',mode:'L',status:'cancelled',totalScore:null,createdAt:'2026-10-19T00:00:00Z',progress:{completed:1,total:3,remaining:2}};
+ b.history=async (_id,page)=>{pages.push(page);return {results:[{...entry,sessionId:'s'+page}],nextPage:page===1?2:null};};
+ b.createSession=async()=>{starts++;throw Error('must not start');};
+ b.historyDetail=async()=>({...entry,review:[{question:{id:'q',prompt:'Name?',direction:'image-to-name',media:{kind:'image',path:'/api/media/frog.jpg'}},answer:'frog',feedback:{correctAnswers:['frog']}}]});
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'history',isDeveloper:false,onBack:()=>{},onPractice:()=>{}}));});
+ await act(async()=>button(view,'More').props.onClick());assert.deepEqual(pages,[1,2]);
+ await act(async()=>button(view,'Review answers').props.onClick());const content=JSON.stringify(view.toJSON());
+ assert.match(content,/Cancelled/);assert.doesNotMatch(content,/Score 0/);assert.match(content,/frog/);assert.equal(view.root.findByType('img').props.src,'/api/media/frog.jpg');assert.equal(starts,0);view.unmount();
+});
+test('difficulties require rejoin and ignore an enrollment completing after navigation',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();let complete,practice=0;
+ b.difficulties=async()=>[{course:{...course,status:'published'},items:[{objectId:'x',name:'Frog'}]}];
+ b.enrollCourse=()=>new Promise(resolve=>complete=resolve);
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',isDeveloper:false,onBack:()=>{},onPractice:()=>practice++}));});
+ await act(async()=>button(view,'Rejoin course').props.onClick());assert.equal(practice,0);
+ await act(async()=>view.unmount());await act(async()=>complete(course));assert.equal(practice,0);
+});
+test('difficult-only setup preserves options with no questions and forwards filter',async()=>{
+ mod.resetBackend();const b=await mod.getBackend();let config,started;
+ b.courseSetup=async (_id,c)=>{config=c;return {...setup,availableQuestionCount:c.difficultOnly?0:30};};
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.CourseSetupPage,{id:'c1',initial:{config:{difficultOnly:true},quantity:'10',mode:'L',all:false},onBack:()=>{},onStart:(_m,_t,c)=>started=c}));});
+ assert.equal(config.difficultOnly,true);assert.equal(button(view,'Start').props.disabled,true);
+ await act(async()=>view.root.findByProps({name:'difficultOnly'}).props.onChange({target:{checked:false}}));assert.equal(button(view,'Start').props.disabled,false);
+ act(()=>button(view,'Start').props.onClick());assert.equal(started.difficultOnly,false);view.unmount();
+});
+test('records load failures are visible and retry; unpublished content cannot be practiced',async()=>{
+ mod.setLocale('en');mod.resetBackend();const b=await mod.getBackend();let fail=true;
+ b.difficulties=async()=>{if(fail)throw Error('offline');return [{course:{...course,status:'draft'},items:[{objectId:'x',name:'Frog'}]}];};
+ let view;await act(async()=>{view=Renderer.create(React.createElement(mod.RecordsPage,{kind:'difficulties',isDeveloper:false,onBack:()=>{},onPractice:()=>assert.fail('must not practice')}));});
+ assert.equal(view.root.findAllByProps({role:'alert'}).length,1);fail=false;await act(async()=>button(view,'Retry').props.onClick());
+ assert.match(JSON.stringify(view.toJSON()),/Course unpublished/);assert.equal(button(view,'Practice'),undefined);assert.equal(button(view,'Rejoin course'),undefined);view.unmount();
+});
+test('history and difficulty navigation translates in every locale',async()=>{
+ for(const locale of ['zh-CN','en','pl','ru','ar']){mod.setLocale(locale);let view;await act(async()=>{view=Renderer.create(React.createElement(mod.TopBar,{user:{username:'admin',isDeveloper:true},onNavigate:()=>{},onLogout:()=>{}}));});const nav=view.root.findByType('nav');assert.equal(nav.findAllByType('button').length,3);for(const b of nav.findAllByType('button'))assert.ok(b.children.join('').length>0);assert.doesNotMatch(JSON.stringify(view.toJSON()),/nav\.history|nav\.difficulties/);view.unmount();}mod.setLocale('en');
 });

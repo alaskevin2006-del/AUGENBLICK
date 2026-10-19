@@ -3,6 +3,8 @@ import type { EngineEvent } from "@znawca/adapter/ZnawcaActivity";
 import {
   ApiError,
   type AuthUser,
+  type HistoryPage,
+  type DifficultyGroup,
   type CourseSetup,
   type SetupConfig,
   type BackendApi,
@@ -92,6 +94,10 @@ class HttpBackend implements BackendApi {
   courseSetup(id: string, config: SetupConfig): Promise<CourseSetup> {
     return request(`/api/courses/${encodeURIComponent(id)}/setup/`, {method: "POST", body: JSON.stringify(config)});
   }
+  unenrollCourse(id: string): Promise<CourseSummary> {return request(`/api/courses/${encodeURIComponent(id)}/unenroll/`, {method:"POST"});}
+  history(courseVersionId?:string, page=1):Promise<HistoryPage> {return request(`/api/history/?page=${page}${courseVersionId ? `&courseVersionId=${encodeURIComponent(courseVersionId)}` : ""}`);}
+  historyDetail(id:string):Promise<RuntimeSnapshot> {return request(`/api/history/${encodeURIComponent(id)}/`);}
+  difficulties(courseVersionId?:string):Promise<readonly DifficultyGroup[]> {return request(`/api/difficulties/${courseVersionId ? `?courseVersionId=${encodeURIComponent(courseVersionId)}` : ""}`);}
   enrollCourse(id: string): Promise<CourseSummary> {
     return request(`/api/courses/${encodeURIComponent(id)}/enroll/`, {
       method: "POST",

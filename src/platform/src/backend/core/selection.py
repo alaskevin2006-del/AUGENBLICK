@@ -6,7 +6,10 @@ from rest_framework.exceptions import ValidationError
 from .runtime import build_questions
 
 
-def select_questions(payload, data, seed=0):
+def select_questions(payload, data, seed=0, difficult_object_ids=None):
+    difficult_only = data.get("difficultOnly", False)
+    if type(difficult_only) is not bool:
+        raise ValidationError("difficultOnly must be a boolean.")
     fields = [c["title"] for c in payload.get("columns", []) if c.get("filterOnly")]
     options = {
         field: sorted(
@@ -70,6 +73,7 @@ def select_questions(payload, data, seed=0):
         for q in scoped
         if (kinds is None or q["kind"] in kinds)
         and (directions is None or q["direction"] in directions)
+        and (not difficult_only or q["objectId"] in (difficult_object_ids or set()))
     ]
     metadata = {
         "availableQuestionCount": len(selected),
@@ -86,5 +90,10 @@ def select_questions(payload, data, seed=0):
             {"field": field, "values": values} for field, values in options.items()
         ],
     }
-    selection = {"kinds": kinds, "directions": directions, "filters": filters}
+    selection = {
+        "kinds": kinds,
+        "directions": directions,
+        "filters": filters,
+        "difficultOnly": difficult_only,
+    }
     return selected, metadata, selection

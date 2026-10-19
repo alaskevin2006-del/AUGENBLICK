@@ -1,3 +1,4 @@
+import {useState} from "react";
 import type { CourseSummary } from "../orchestrator/types";
 import { useT } from "../i18n";
 export function CourseListPage({
@@ -6,18 +7,22 @@ export function CourseListPage({
   view,
   onEnter,
   onEnroll,
+  onUnenroll,
 }: {
   readonly courses: readonly CourseSummary[];
   readonly disabled?: boolean;
   readonly view: "courses" | "my-courses";
   readonly onEnter: (id: string) => void;
+  readonly onUnenroll?: (id:string) => void;
   readonly onEnroll: (id: string) => void;
 }) {
   const t = useT();
+  const [withdraw, setWithdraw] = useState<CourseSummary|null>(null);
   return (
     <div className="workspace">
       <section className="content">
         <div className="page-courses">
+          {withdraw && <div className="dialog-backdrop"><section className="host-dialog" role="dialog" aria-modal="true" aria-labelledby="withdraw-title"><h2 id="withdraw-title" dir="auto">{withdraw.title}</h2><p>{t("courses.withdrawConfirm")}</p><div className="course-actions"><button className="metal-button" onClick={()=>setWithdraw(null)}>{t("setup.cancel")}</button><button className="gold-button" disabled={disabled} onClick={()=>{onUnenroll?.(withdraw.courseVersionId);setWithdraw(null);}}>{t("courses.withdraw")}</button></div></section></div>}
           <h1>{t(view === "courses" ? "nav.select" : "nav.mine")}</h1>
           <div className="course-grid">
             {courses.map((course) => (
@@ -44,6 +49,7 @@ export function CourseListPage({
                     ) : (
                       <button className="metal-button" disabled={disabled || course.engine !== "znawca"} onClick={() => onEnter(course.courseVersionId)}>{t("courses.enter")}</button>
                     )}
+                    {view === "my-courses" && onUnenroll && <button className="metal-button" disabled={disabled} onClick={()=>setWithdraw(course)}>{t("courses.withdraw")}</button>}
                   </div>
                 </div>
               </article>

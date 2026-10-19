@@ -196,3 +196,9 @@ body .content.course-setup { width: 100%; max-width: none; padding-inline: max(2
 .course-setup input { accent-color: #d5b55d; }
 .course-setup summary { cursor: pointer; padding-block: 12px; }
 .course-setup .gold-button { margin-block: 18px; }
+
+.records-page {width:100%;padding-inline:max(24px,calc((100% - 980px)/2));}
+.record-card {padding:24px;margin-block:16px;border:1px solid var(--border,#25453a);border-radius:4px;}
+.record-card h2 {margin-top:0;}
+.difficulty-toggle {display:flex;gap:10px;align-items:center;margin-block:20px;}
+.records-page .answer-review {width:100%;}

@@ -1,8 +1,15 @@
 from django.urls import path
 
-from . import auth_views, dev_views, views, catalog_views
+from . import auth_views, dev_views, views, catalog_views, records_views
 
 urlpatterns = [
+    path("history/", records_views.HistoryView.as_view()),
+    path("history/<uuid:session_id>/", records_views.HistoryDetailView.as_view()),
+    path("difficulties/", records_views.DifficultiesView.as_view()),
+    path(
+        "courses/<str:course_version_id>/unenroll/",
+        records_views.UnenrollCourseView.as_view(),
+    ),
     path("health/", views.HealthView.as_view()),
     path("auth/login/", auth_views.LoginView.as_view()),
     path("auth/logout/", auth_views.LogoutView.as_view()),

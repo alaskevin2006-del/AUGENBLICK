@@ -73,6 +73,7 @@ export function TopBar({
               </button>
             </>
           )}
+          {(["history", "difficulties"] as const).map(page=><button key={page} className="nav-link" aria-current={active === page ? "page" : undefined} onClick={()=>onNavigate(page)}>{t(page === "history" ? "nav.history" : "nav.difficulties")}</button>)}
         </nav>
         {title && (
           <span className="host-title" dir="auto">

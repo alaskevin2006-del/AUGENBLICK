@@ -6,10 +6,10 @@ import { translate, type MessageKey } from "@znawca/core/localization";
 import { useLocale, useT } from "../i18n";
 
 export interface SetupPreferences { config: SetupConfig; mode: "L" | "T"; all: boolean; quantity: string }
-export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPreferences}: {
+export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPreferences, onRecords}: {
   id: string; disabled?: boolean; initial?: SetupPreferences; onPreferences?: (value: SetupPreferences) => void;
   onStart: (mode: "L" | "T", title: string, config: Omit<CreateSessionRequest, "courseVersionId" | "mode" | "preview">) => void;
-  onBack: () => void;
+  onBack: () => void; onRecords?: (page:"history"|"difficulties") => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -50,6 +50,7 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
   const valid = all || (Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= limit);
   return <div className="workspace"><section className="content course-setup">
     <button className="metal-button" onClick={onBack}>{t("setup.back")}</button>
+    {onRecords && <div className="course-actions"><button className="metal-button" onClick={()=>onRecords("history")}>{t("nav.history")}</button><button className="metal-button" onClick={()=>onRecords("difficulties")}>{t("nav.difficulties")}</button></div>}
     {metadata && <h1 dir="auto">{metadata.course.title}</h1>}
     {loading && <p role="status">{t("page.loading")}</p>}
     {failed && <div role="alert"><p>{t("error.loadFailed")}</p><button className="metal-button" onClick={() => setRetry(n => n + 1)}>{t("error.retry")}</button></div>}
@@ -62,6 +63,7 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
         <label><input type="radio" name="scope" checked={all} onChange={() => setAll(true)}/>{t("setup.all")}</label>
         {!all && <label>{t("setup.quantity")}<input type="number" min={1} max={limit} step={1} value={quantity} onChange={e => setQuantity(e.target.value)}/></label>}
       </fieldset>
+      <label className="difficulty-toggle"><input type="checkbox" name="difficultOnly" disabled={disabled || loading} checked={config.difficultOnly ?? false} onChange={e=>setConfig(c=>({...c,difficultOnly:e.target.checked}))}/>{t("difficulties.only")}</label>
       <details><summary>{t("setup.advanced")}</summary>
         <fieldset disabled={disabled || loading}><legend>{t("setup.kinds")}</legend>{choices.kinds.map(k => <label key={k.value}><input type="checkbox" checked={(config.kinds ?? choices.kinds.map(v => v.value)).includes(k.value)} onChange={() => setConfig(c => ({...c, kinds: toggle(c.kinds ?? choices.kinds.map(v => v.value), k.value)}))}/>{t(k.value === "input" ? "setup.input" : "setup.choice")}</label>)}</fieldset>
         {choices.directions.length > 0 && <fieldset disabled={disabled || loading}><legend>{t("setup.directions")}</legend>{choices.directions.map(d => <label key={d.value} dir="auto"><input type="checkbox" checked={(config.directions ?? choices.directions.map(v => v.value)).includes(d.value)} onChange={() => setConfig(c => ({...c, directions: toggle(c.directions ?? choices.directions.map(v => v.value), d.value)}))}/>{directionKeys[d.value] ? translate(locale, directionKeys[d.value]) : d.value}</label>)}</fieldset>}

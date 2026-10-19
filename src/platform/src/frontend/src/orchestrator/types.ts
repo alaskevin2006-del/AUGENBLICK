@@ -36,6 +36,7 @@ export interface CreateSessionRequest {
   readonly directions?: readonly string[];
   readonly filters?: readonly CourseFilter[];
   readonly preview?: boolean;
+  readonly difficultOnly?: boolean;
 }
 
 export interface CreateSessionResponse {
@@ -97,6 +98,10 @@ export interface BackendApi {
   publishCourse(id: string): Promise<CourseSummary>;
   unpublishCourse(id: string): Promise<CourseSummary>;
   courseSetup(id: string, config: SetupConfig): Promise<CourseSetup>;
+  unenrollCourse(id: string): Promise<CourseSummary>;
+  history(courseVersionId?: string, page?: number): Promise<HistoryPage>;
+  historyDetail(id: string): Promise<RuntimeSnapshot>;
+  difficulties(courseVersionId?: string): Promise<readonly DifficultyGroup[]>;
   enrollCourse(id: string): Promise<CourseSummary>;
   listCourses(): Promise<readonly CourseSummary[]>;
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
@@ -127,7 +132,7 @@ export interface UploadProgress {
 }
 
 export interface CourseFilter { readonly field: string; readonly values: readonly string[] }
-export interface SetupConfig { readonly kinds?: readonly string[]; readonly directions?: readonly string[]; readonly filters?: readonly CourseFilter[] }
+export interface SetupConfig { readonly difficultOnly?: boolean; readonly kinds?: readonly string[]; readonly directions?: readonly string[]; readonly filters?: readonly CourseFilter[] }
 export interface CourseSetup {
  readonly course: CourseSummary;
  readonly availableQuestionCount: number;
@@ -137,3 +142,7 @@ export interface CourseSetup {
  readonly filters: readonly CourseFilter[];
  readonly testSubmitted: boolean;
 }
+
+export interface HistoryEntry {sessionId:string; courseVersionId:string; title:string; mode:"L"|"T"; status:"finished"|"skipped"|"cancelled"; isPreview:boolean; totalScore:number|null; createdAt:string; updatedAt:string; progress:{total:number;completed:number;remaining:number}}
+export interface HistoryPage {results:readonly HistoryEntry[]; nextPage:number|null}
+export interface DifficultyGroup {course:CourseSummary; items:readonly {objectId:string;name:string;consecutiveCorrect:number;lastPracticedAt:string}[]}

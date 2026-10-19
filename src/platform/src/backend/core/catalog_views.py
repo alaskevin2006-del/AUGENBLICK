@@ -110,7 +110,16 @@ class CourseSetupView(AuthenticatedView):
             raise PermissionDenied("Join this course before learning.")
         if course.engine != "znawca":
             raise ValidationError("This engine is not available yet.")
-        _, metadata, _ = select_questions(course.payload, request.data)
+        from .records_views import difficult_objects
+
+        difficult_ids = (
+            {key[1] for key in difficult_objects(request.user, course.pk)}
+            if request.data.get("difficultOnly") is True
+            else None
+        )
+        _, metadata, _ = select_questions(
+            course.payload, request.data, difficult_object_ids=difficult_ids
+        )
         return Response(
             {
                 "course": course_summary(course, enrolled),

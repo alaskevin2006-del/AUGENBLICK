@@ -7,7 +7,7 @@ import {
 } from "../orchestrator/api";
 import { clearAuth, getStoredUser, getToken } from "../orchestrator/auth";
 import { enterCourse, type ActiveActivity } from "../orchestrator/session";
-import { roleRoute, courseRoute, type PageRoute } from "../orchestrator/routes";
+import { roleRoute, courseRoute, recordsCourse, type PageRoute } from "../orchestrator/routes";
 import {
   ApiError,
   type AuthUser,
@@ -20,6 +20,7 @@ import { CourseSetupPage, type SetupPreferences } from "./CourseSetupPage";
 import { CourseListPage } from "./CourseListPage";
 import { LoginPage } from "./LoginPage";
 import { DeveloperPage } from "./DeveloperPage";
+import { RecordsPage } from "./RecordsPage";
 import { TopBar } from "./TopBar";
 import { textDirection, useLocale, useT, type ShellKey } from "../i18n";
 export function App() {
@@ -51,6 +52,7 @@ export function App() {
   const routedHash = useRef(hash);
   routedHash.current = hash;
   const courseId = courseRoute(hash);
+  const recordCourseId = recordsCourse(hash);
   const route = user ? roleRoute(user, hash) : "courses";
   useEffect(() => {
     document.documentElement.dir = textDirection(locale);
@@ -117,7 +119,7 @@ export function App() {
       .catch(() => undefined);
   }, [user?.username]);
   useEffect(() => {
-    if (user && !courseId && hash !== `#/${route}`) {
+    if (user && !courseId && route !== "history" && route !== "difficulties" && hash !== `#/${route}`) {
       window.history.replaceState(null, "", `#/${route}`);
       setHash(`#/${route}`);
     }
@@ -182,6 +184,12 @@ export function App() {
       }
     }
   };
+  const openRecords = (target:"history"|"difficulties", id?:string) => {
+    invalidateNavigation();setActivity(null);setFailure(null);
+    const next = `#/${target}${id ? `?course=${encodeURIComponent(id)}` : ""}`;
+    routedHash.current=next;window.location.hash=next;setHash(next);
+  };
+  const practice = (id:string) => {setupPreferences.current[id]={config:{difficultOnly:true},mode:"L",all:false,quantity:"10"};openSetup(id);};
   const openSetup = (id: string) => {
     invalidateNavigation(); setActivity(null); setFailure(null);
     const target = `#/course/${encodeURIComponent(id)}`;
@@ -278,7 +286,7 @@ export function App() {
           {t("page.loading")}
         </p>
       )}
-      {courseId ? <CourseSetupPage key={`${user.username}:${courseId}`} id={courseId} initial={setupPreferences.current[courseId]} onPreferences={value => {setupPreferences.current[courseId] = value;}} disabled={busy} onBack={() => navigate(user.isDeveloper ? "developer" : "my-courses")} onStart={(mode, title, config) => open(courseId, mode, title, config)}/> : route === "developer" ? (
+      {courseId ? <CourseSetupPage key={`${user.username}:${courseId}`} id={courseId} initial={setupPreferences.current[courseId]} onRecords={page=>openRecords(page,courseId)} onPreferences={value => {setupPreferences.current[courseId] = value;}} disabled={busy} onBack={() => navigate(user.isDeveloper ? "developer" : "my-courses")} onStart={(mode, title, config) => open(courseId, mode, title, config)}/> : route === "history" || route === "difficulties" ? <RecordsPage key={`${user.username}:${route}:${recordCourseId??""}`} kind={route} courseId={recordCourseId} isDeveloper={user.isDeveloper} onPractice={practice} onBack={()=>recordCourseId ? openSetup(recordCourseId) : navigate(user.isDeveloper?"developer":"my-courses")}/> : route === "developer" ? (
         <DeveloperPage
           isDeveloper={user.isDeveloper}
           courses={courses}
@@ -306,6 +314,7 @@ export function App() {
           courses={courses}
           disabled={busy || loading}
           onEnter={openSetup}
+          onUnenroll={id=>void action(async isCurrent=>{const backend=backendRef.current??await getBackend();if(!isCurrent())return;await backend.unenrollCourse(id);if(isCurrent())await refresh();})}
           onEnroll={(id) =>
             void action(async (isCurrent) => {
               const backend = backendRef.current ?? (await getBackend());

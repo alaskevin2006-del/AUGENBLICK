@@ -249,3 +249,42 @@ class PostgreSQLRuntimeConcurrencyTests(TransactionTestCase):
             ).count(),
             1,
         )
+
+    def test_withdrawal_racing_start_leaves_no_active_activity(self):
+        start, withdraw = self.race(
+            ("/api/sessions/", self.start_payload),
+            (f"/api/courses/{self.course.pk}/unenroll/", {}),
+        )
+        self.assertEqual(withdraw[0], 200, withdraw)
+        self.assertIn(start[0], (201, 403), start)
+        self.assertFalse(Enrollment.objects.filter(user=self.user).exists())
+        self.assertFalse(
+            Session.objects.filter(user=self.user, status="active").exists()
+        )
+
+    def test_withdrawal_racing_answer_preserves_only_committed_review(self):
+        session = self.start()
+        answer, withdraw = self.race(
+            (
+                f"/api/sessions/{session['sessionId']}/answer/",
+                {
+                    "questionId": session["question"]["id"],
+                    "submissionId": str(uuid.uuid4()),
+                    "answer": "wrong",
+                },
+            ),
+            (f"/api/courses/{self.course.pk}/unenroll/", {}),
+        )
+        self.assertEqual(withdraw[0], 200, withdraw)
+        self.assertIn(answer[0], (200, 403), answer)
+        saved = Session.objects.get(pk=session["sessionId"])
+        self.assertEqual(saved.status, "cancelled")
+        self.assertEqual(len(saved.runtime["review"]), int(answer[0] == 200))
+        self.assertEqual(saved.events.filter(type="activityInterrupted").count(), 1)
+
+    def test_concurrent_withdrawal_is_idempotent(self):
+        self.start()
+        request = (f"/api/courses/{self.course.pk}/unenroll/", {})
+        results = self.race(request, request)
+        self.assertEqual([status for status, _ in results], [200, 200], results)
+        self.assertEqual(Event.objects.filter(type="activityInterrupted").count(), 1)

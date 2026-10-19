@@ -167,7 +167,16 @@ class SessionListView(AuthenticatedView):
         if count is not None and (type(count) is not int or count < 1 or count > 1000):
             raise ValidationError("itemCount must be an integer from 1 to 1000.")
         seed = random.SystemRandom().randint(0, 2**31 - 1)
-        questions, _, selection = select_questions(course.payload, request.data, seed)
+        from .records_views import difficult_objects
+
+        difficult_ids = (
+            {key[1] for key in difficult_objects(request.user, course.pk)}
+            if request.data.get("difficultOnly") is True
+            else None
+        )
+        questions, _, selection = select_questions(
+            course.payload, request.data, seed, difficult_ids
+        )
         if not questions:
             raise ValidationError("This course has no usable questions.")
         questions = questions[:count] if count is not None else questions

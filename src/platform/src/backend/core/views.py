@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 import random
 import time
 import uuid
@@ -22,6 +24,13 @@ class Conflict(APIException):
 
 class AuthenticatedView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if request.method in ("POST", "PUT", "PATCH") and not isinstance(
+            request.data, Mapping
+        ):
+            raise ValidationError("Request body must be a JSON object.")
 
 
 def owned(request, session_id, lock=False):
@@ -105,7 +114,7 @@ class SessionListView(AuthenticatedView):
         questions = build_questions(course.payload, seed)
         if not questions:
             raise ValidationError("This course has no usable questions.")
-        questions = questions[: count or min(20, len(questions))]
+        questions = questions[:count] if count is not None else questions
         for previous in sessions.select_for_update().filter(status="active"):
             previous.status = "cancelled"
             previous.save(update_fields=["status", "updated_at"])

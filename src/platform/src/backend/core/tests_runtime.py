@@ -74,6 +74,36 @@ class RuntimeTests(TestCase):
             format="json",
         ).data
 
+    def test_default_scope_includes_whole_pool_over_twenty_questions(self):
+        from .runtime import build_questions
+
+        self.course.payload["items"] = [
+            {
+                "id": str(i),
+                "name": f"Name {i}",
+                "values": {"Property": [f"Value {i}"]},
+                "media": [],
+                "cellMedia": {},
+            }
+            for i in range(12)
+        ]
+        self.course.save(update_fields=["payload"])
+        expected = len(build_questions(self.course.payload, 1))
+        self.assertGreater(expected, 20)
+        self.assertEqual(self.start()["progress"]["total"], expected)
+
+    def test_non_object_write_bodies_return_validation_error(self):
+        session = self.start(itemCount=1)
+        urls = ["/api/sessions/"] + [
+            f"/api/sessions/{session['sessionId']}/{action}/"
+            for action in ("answer", "next", "finish", "skip", "events")
+        ]
+        for url in urls:
+            for payload in ([], ["invalid"], "invalid", 12):
+                with self.subTest(url=url, payload=payload):
+                    response = self.client.post(url, payload, format="json")
+                    self.assertEqual(response.status_code, 400, response.data)
+
     def test_isolation(self):
         s = self.start()
         self.assertNotIn("acceptedAnswers", str(s))

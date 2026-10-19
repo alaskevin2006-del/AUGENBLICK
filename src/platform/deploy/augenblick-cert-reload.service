@@ -1,0 +1,8 @@
+[Unit]
+Description=Reload AUGENBLICK TLS certificate without touching adjacent sites
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /opt/augenblick/current/src/platform/deploy/reload-tls.sh

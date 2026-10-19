@@ -1,0 +1,4 @@
+services:
+  web:
+    build:
+      dockerfile: platform/deploy/Dockerfile.frontend.prebuilt

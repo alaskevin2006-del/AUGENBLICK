@@ -1,0 +1,11 @@
+[Unit]
+Description=Pick up renewed IP certificates in AUGENBLICK
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:15:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=augenblick-cert-reload.service
+
+[Install]
+WantedBy=timers.target

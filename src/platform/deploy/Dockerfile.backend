@@ -1,26 +1,13 @@
-# 后端镜像：Django 5.2 + gunicorn + WhiteNoise（媒体 /media/）
-# 构建上下文：AUGENBLICK/src（需含 platform/src/backend）
 FROM python:3.13-slim
-
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
-
 COPY platform/src/backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
 COPY platform/src/backend/ .
-
-ENV DJANGO_DEBUG=0 \
-    DJANGO_ALLOWED_HOSTS=* \
-    DB_ENGINE=postgresql \
-    DB_NAME=augenblick \
-    DB_USER=augenblick \
-    DB_HOST=db \
-    DB_PORT=5432 \
-    MEDIA_ROOT=/data/media
-
-RUN mkdir -p /data/media
-
+COPY platform/deploy/healthcheck.py /app/healthcheck.py
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app \
+    && mkdir -p /data/media && chown app:app /data/media
+USER app
 EXPOSE 8000
-# 启动先迁移；课程导入另行执行：docker compose exec backend python manage.py import_znawca /courses/<目录>
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
+# Migrations run explicitly before deployment, never on automatic restarts.
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "180", "--access-logfile", "-", "--error-logfile", "-"]

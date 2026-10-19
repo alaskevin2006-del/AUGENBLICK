@@ -1,0 +1,17 @@
+# Independent TLS listener; existing port 80/443 services remain untouched.
+services:
+  web:
+    ports:
+      - "${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-18443}:8443"
+    environment:
+      SSL_CERTIFICATE: ${SSL_CERTIFICATE:?Set certificate container path}
+      SSL_CERTIFICATE_KEY: ${SSL_CERTIFICATE_KEY:?Set private key container path}
+      NGINX_ENVSUBST_FILTER: ^SSL_CERTIFICATE
+    volumes:
+      - type: bind
+        source: ${TLS_CERTIFICATES_DIR:?Set certificate root including symlink targets}
+        target: /etc/augenblick/certificates
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./nginx-tls.conf.template:/etc/nginx/templates/default.conf.template:ro

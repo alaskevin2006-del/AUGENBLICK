@@ -1,0 +1,6 @@
+# Build frontend locally; transfer dist alongside the same source revision.
+FROM nginx:stable-alpine
+COPY platform/src/frontend/dist /usr/share/nginx/html
+COPY platform/deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY platform/deploy/nginx-locations.conf /etc/nginx/augenblick-locations.conf
+EXPOSE 80 8443

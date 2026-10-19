@@ -23,6 +23,19 @@ const labels = {error:'Connection failed',retry:'Retry',finish:'Submit results',
 const props = api => ({initialSnapshot:initial,courseTitle:'Geography',interfaceLang:'en',labels,api,onExit:()=>{}});
 const button = (view,label) => view.root.findAllByType('button').find(b=>b.children.join('')===label);
 
+test('learning feedback uses current question mastery independently of remaining questions', async () => {
+  for (const needsAnother of [false, true]) {
+    let view;
+    await act(async () => { view = Renderer.create(React.createElement(mod.ZnawcaActivity, {
+      ...props({}), initialSnapshot: {...initial, mode:'L', feedback:{...feedback, needsAnother}, progress:{total:15,completed:1,remaining:14}}, interfaceLang:'zh-CN'
+    })); });
+    const text = JSON.stringify(view.toJSON());
+    assert.equal(text.includes('已正确一次，请再连续答对一次。'), needsAnother);
+    assert.equal(text.includes('本题已掌握'), !needsAnother);
+    view.unmount();
+  }
+});
+
 test('entry starts selected mode without fetching answer-bearing payload or resuming a different mode', async () => {
   const calls=[];
   const backend={createSession:async body=>{calls.push(body);return initial;},getPayload:()=>{throw Error('must not fetch payload');},findActiveSession:()=>{throw Error('must not resume');}};

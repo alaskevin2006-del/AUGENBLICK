@@ -65,7 +65,7 @@ function Activity(props: ZnawcaActivityProps) {
     {snapshot.question && <SessionView key={snapshot.question.id} question={{...snapshot.question, acceptedAnswers: snapshot.feedback?.correctAnswers ?? []}}
       courseTitle={props.courseTitle} mode={snapshot.mode} position={Math.min(snapshot.progress.completed + 1, snapshot.progress.total)}
       total={snapshot.progress.total} units={snapshot.progress} answer={answer} setAnswer={setAnswer}
-      feedback={snapshot.feedback ?? undefined} needsAnother={snapshot.mode === "L" && snapshot.progress.remaining > 0}
+      feedback={snapshot.feedback ?? undefined} needsAnother={snapshot.feedback?.needsAnother === true}
       disabled={pending || failed} onSubmit={submit} onNext={() => advance(snapshot.canFinish ? "finish" : "next")}
       nextLabel={snapshot.canFinish ? props.labels.finish : undefined} />}
     {!snapshot.question && snapshot.canFinish && <button className="gold-button" disabled={pending || failed} onClick={() => advance("finish")}>{props.labels.finish}</button>}

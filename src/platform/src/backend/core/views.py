@@ -206,6 +206,7 @@ class SessionAnswerView(AuthenticatedView):
                 state["failed"].append(question_id)
             state["streaks"][question_id] = 0
             mastered = False
+        feedback["needsAnother"] = s.mode == "L" and not mastered
         if mastered:
             state["mastered"].append(question_id)
         if question_id in state["cycleRemaining"]:

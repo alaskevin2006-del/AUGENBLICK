@@ -3,7 +3,7 @@ export type PublicQuestion = Omit<Question, "acceptedAnswers" | "options"> & {
   readonly speechUrls?: readonly string[];
   readonly options?: readonly (NonNullable<Question["options"]>[number] & {readonly speechUrl?: string})[];
 };
-export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; }
+export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; readonly needsAnother?: boolean; }
 export interface RuntimeSnapshot {
   readonly sessionId: string;
   readonly courseVersionId: string;

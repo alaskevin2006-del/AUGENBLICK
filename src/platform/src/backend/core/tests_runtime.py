@@ -173,8 +173,20 @@ class RuntimeTests(TestCase):
         s = self.advance(s)
         s = self.answer(s, ";".join(correct)).data
         self.assertFalse(s["canFinish"])
+        self.assertTrue(s["feedback"]["needsAnother"])
         s = self.advance(s)
-        self.assertTrue(self.answer(s, ";".join(correct)).data["canFinish"])
+        resolved = self.answer(s, ";".join(correct)).data
+        self.assertTrue(resolved["canFinish"])
+        self.assertFalse(resolved["feedback"]["needsAnother"])
+
+    def test_first_correct_feedback_is_mastered_with_other_questions_remaining(self):
+        s = self.start("L")
+        saved = Session.objects.get(pk=s["sessionId"])
+        q = saved.runtime["questions"][s["question"]["id"]]
+        resolved = self.answer(s, ";".join(q["acceptedAnswers"])).data
+        self.assertTrue(resolved["feedback"]["fullyCorrect"])
+        self.assertFalse(resolved["feedback"]["needsAnother"])
+        self.assertGreater(resolved["progress"]["remaining"], 0)
 
     def test_stale_next_cannot_dismiss_new_feedback(self):
         s = self.start("L", itemCount=1)

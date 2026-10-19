@@ -187,6 +187,37 @@ class RuntimeTests(TestCase):
             result["feedback"]["submissionId"], old["feedback"]["submissionId"]
         )
 
+    def test_item_started_events_are_emitted_once_per_transition(self):
+        session = self.start("T", itemCount=2)
+        saved = Session.objects.get(pk=session["sessionId"])
+        self.assertEqual(saved.events.filter(type="itemStarted").count(), 1)
+        answered = self.answer(session).data
+        next_question = self.advance(answered)
+        self.assertEqual(saved.events.filter(type="itemStarted").count(), 2)
+        self.assertEqual(self.advance(answered), next_question)
+        self.assertEqual(saved.events.filter(type="itemStarted").count(), 2)
+        final_answer = self.answer(next_question).data
+        self.advance(final_answer)
+        self.assertEqual(saved.events.filter(type="itemStarted").count(), 2)
+        self.assertEqual(
+            list(saved.events.order_by("seq").values_list("seq", flat=True)),
+            list(range(1, 6)),
+        )
+
+    def test_learning_requeue_is_randomized_without_immediate_repeat(self):
+        session = self.start("L", itemCount=4)
+        saved = Session.objects.get(pk=session["sessionId"])
+        saved.random_seed = 0
+        saved.save(update_fields=["random_seed"])
+        original = list(saved.runtime["queue"])
+        observed = []
+        for _ in range(12):
+            observed.append(session["question"]["id"])
+            session = self.advance(self.answer(session).data)
+        self.assertTrue(all(a != b for a, b in zip(observed, observed[1:])))
+        self.assertNotEqual(observed, original * 3)
+        self.assertEqual(set(observed), set(original))
+
     def test_payload(self):
         self.assertEqual(
             self.client.get("/api/courses/demo@1/payload/").status_code, 403
@@ -202,7 +233,7 @@ class RuntimeTests(TestCase):
         saved = Session.objects.get(pk=session["sessionId"])
         self.assertIsNone(saved.runtime["feedback"])
         self.assertEqual(saved.submissions.count(), 0)
-        self.assertEqual(saved.events.count(), 1)
+        self.assertEqual(saved.events.count(), 2)
 
     def test_testing_cannot_skip_and_client_score_ignored(self):
         s = self.start(itemCount=1)
@@ -421,3 +452,4 @@ class HealthTests(TestCase):
             response = self.client.get("/api/health/")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("private detail", response.content.decode())
+

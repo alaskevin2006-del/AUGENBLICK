@@ -129,6 +129,7 @@ class SessionListView(AuthenticatedView):
         record(
             session, "activityReady", {"mode": mode, "questionCount": len(questions)}
         )
+        record(session, "itemStarted", {"questionId": session.runtime["queue"][0]})
         return Response(snapshot(session), status=201)
 
 
@@ -253,9 +254,15 @@ class SessionNextView(AuthenticatedView):
         ):
             qid = state["queue"].pop(0)
             if qid not in state["mastered"]:
-                state["queue"].append(qid)
+                # Repeat failed learning questions at a reproducibly randomized position.
+                # Keep at least one other pending question ahead when possible.
+                rng = random.Random(s.random_seed + len(state["review"]))
+                position = rng.randint(1, len(state["queue"])) if state["queue"] else 0
+                state["queue"].insert(position, qid)
             state["feedback"] = None
             s.save(update_fields=["runtime", "updated_at"])
+            if state["queue"]:
+                record(s, "itemStarted", {"questionId": state["queue"][0]})
         return Response(snapshot(s))
 
 

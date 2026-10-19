@@ -1,6 +1,7 @@
 """开发者课程上传（契约§九）：POST /api/dev/courses/upload/，需认证 + is_staff。"""
 import tempfile
 import zipfile
+import stat
 from pathlib import Path
 
 from rest_framework import status as http
@@ -52,7 +53,12 @@ class CourseUploadView(APIView):
 def _safe_extract(zf: zipfile.ZipFile, target: Path):
     """解压并防 zip-slip：成员路径必须落在目标目录内。"""
     root = target.resolve()
-    for member in zf.infolist():
+    members = zf.infolist()
+    if len(members) > 20000 or sum(m.file_size for m in members) > 1024 * 1024 * 1024:
+        raise CourseImportError("ZIP 过大", "解压内容不得超过 1GB 或 20000 个文件。")
+    for member in members:
+        if member.flag_bits & 1 or stat.S_ISLNK(member.external_attr >> 16):
+            raise CourseImportError("非法的 ZIP", "不支持加密文件或符号链接。")
         dest = (root / member.filename).resolve()
         if dest != root and root not in dest.parents:
             raise CourseImportError("非法的 ZIP", f"ZIP 内含越界路径：{member.filename}")

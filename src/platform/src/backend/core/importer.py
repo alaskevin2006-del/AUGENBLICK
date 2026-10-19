@@ -121,12 +121,22 @@ def _build_media_index(media_dir: Path) -> dict:
     return {p.name.lower(): p.name for p in media_dir.iterdir() if p.is_file()}
 
 
-def _content_hash(workbook: Path, media_index: dict, speech_files: list, feedback: list) -> str:
-    """xlsx 字节 + 媒体文件清单（media/ + speech/<lang>/ + 正误音效，排序文件名）。"""
+def _content_hash(workbook: Path, media_index: dict, speech_files: list, feedback: list, lang: str) -> str:
+    """Hash names and bytes, including all assets; same-name replacements are new versions."""
     h = hashlib.sha256()
-    h.update(workbook.read_bytes())
-    manifest = sorted(media_index.values()) + [f"speech/{n}" for n in speech_files] + feedback
-    h.update("\n".join(manifest).encode("utf-8"))
+    root = workbook.parent
+    paths = [workbook] + [root / "media" / n for n in media_index.values()]
+    paths += [root / "speech" / lang / n for n in speech_files]
+    paths += [root / n for n in feedback]
+    for path in sorted(paths, key=lambda p: p.relative_to(root).as_posix()):
+        name = path.relative_to(root).as_posix().encode("utf-8")
+        h.update(len(name).to_bytes(8, "big"))
+        h.update(name)
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        h.update(digest.digest())
     return h.hexdigest()
 
 
@@ -140,8 +150,8 @@ def _import_workbook(course_dir, workbook, base, lang, media_index, feedback) ->
         if speech_dir.is_dir() else []
     )
 
-    content_hash = _content_hash(workbook, media_index, speech_files, feedback)
-    version_id = f"{normalize_key(f'{base}_{lang}')}@{content_hash[:8]}"
+    content_hash = _content_hash(workbook, media_index, speech_files, feedback, lang)
+    version_id = f"{normalize_key(f'{base}_{lang}')}@{content_hash}"
 
     # 版本不可变：同 hash 重复导入直接复用
     existing = CourseVersion.objects.filter(content_hash=content_hash).first()

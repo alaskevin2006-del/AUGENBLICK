@@ -1,12 +1,19 @@
 """配置：默认开发（SQLite + DEBUG）；环境变量切换生产（PostgreSQL + 静态/媒体由 WhiteNoise 托管）。"""
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-key")
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",") if h.strip()]
+
+if not DEBUG:
+    if SECRET_KEY == "dev-only-insecure-key" or len(SECRET_KEY) < 50:
+        raise ImproperlyConfigured("Production requires DJANGO_SECRET_KEY with at least 50 characters.")
+    if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+        raise ImproperlyConfigured("Production requires explicit DJANGO_ALLOWED_HOSTS.")
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -18,8 +25,14 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -61,6 +74,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.TokenAuthentication"],
+    "DEFAULT_THROTTLE_RATES": {"login": "20/min"},
+    "NUM_PROXIES": 1,
 }
 
 # 上传走临时文件而非内存（课程 ZIP ≤200MB，契约§九）

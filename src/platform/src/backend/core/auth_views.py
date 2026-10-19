@@ -5,6 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 
 
 class LoginView(APIView):
@@ -12,8 +13,15 @@ class LoginView(APIView):
 
     authentication_classes = []  # 公开端点，坏 token 头也不拦
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request):
+        if not isinstance(request.data, dict) or not all(
+            isinstance(request.data.get(key), str) and 0 < len(request.data[key]) <= 1024
+            for key in ("username", "password")
+        ):
+            return Response({"error": "请输入用户名和密码。"}, status=http.HTTP_400_BAD_REQUEST)
         user = authenticate(
             username=request.data.get("username"),
             password=request.data.get("password"),

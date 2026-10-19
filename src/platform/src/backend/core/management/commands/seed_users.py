@@ -1,6 +1,7 @@
 """创建切片种子账号（幂等）：dev/dev123（开发者）与 user/user123（学习者）。"""
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.conf import settings
 
 ACCOUNTS = [
     ("dev", "dev123", True),
@@ -12,6 +13,8 @@ class Command(BaseCommand):
     help = "创建/重置种子账号：dev（is_staff）与 user"
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("Development seed accounts are disabled in production. Use createsuperuser.")
         for username, password, is_staff in ACCOUNTS:
             user, created = User.objects.get_or_create(
                 username=username, defaults={"is_staff": is_staff}

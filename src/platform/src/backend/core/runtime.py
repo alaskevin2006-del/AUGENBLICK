@@ -256,6 +256,9 @@ def initial_state(questions):
 
 
 def public_question(q):
+    if q.get('engine','znawca') != 'znawca':
+        return {key: value for key,value in {**q,'objectId':q['id']}.items()
+                if key in ('id','objectId','engine','kind','prompt','interaction','direction')}
     result = {
         k: v for k, v in q.items() if k not in ("acceptedAnswers", "answerLabels")
     }
@@ -275,6 +278,8 @@ def snapshot(session):
     q = questions.get(queue[0]) if queue and session.status == "active" else None
     return {
         "sessionId": str(session.id),
+        "engine": session.course_version.engine,
+        "interactionFeedback": state.get('interactionFeedback'),
         "isPreview": session.is_preview,
         "courseVersionId": session.course_version_id,
         "title": session.course_version.title,

@@ -4,6 +4,8 @@ import { getToken } from "../orchestrator/auth";
 import type { CourseSetup, SetupConfig, CreateSessionRequest } from "../orchestrator/types";
 import { translate, type MessageKey } from "@znawca/core/localization";
 import { useLocale, useT } from "../i18n";
+import {engineText,kindLabel} from '../engines/labels';
+import {ReferencePanel} from '../engines/ReferencePanel';
 
 export interface SetupPreferences { config: SetupConfig; mode: "L" | "T"; all: boolean; quantity: string }
 export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPreferences, onRecords, embedded, forcedMode}: {
@@ -56,6 +58,9 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
     {loading && <p role="status">{t("page.loading")}</p>}
     {failed && <div role="alert"><p>{t("error.loadFailed")}</p><button className="metal-button" onClick={() => setRetry(n => n + 1)}>{t("error.retry")}</button></div>}
     {choices && <>
+      {choices.hasReference&&mode==='L'&&<ReferencePanel key={id} id={id} locale={locale}/>}
+      {choices.checkpoints&&choices.checkpoints.length>0&&<label>{engineText(locale,'checkpoint')} <select disabled={loading||disabled} value={config.checkpoint??''} onChange={e=>setConfig(c=>({...c,checkpoint:e.target.value?Number(e.target.value):undefined}))}><option value="">{engineText(locale,'start')}</option>{choices.checkpoints.map(c=><option key={c.id} value={c.id}>{c.label??c.id}</option>)}</select></label>}
+      {choices.testAvailable===false&&<p role="status">{engineText(locale,'voiceLimit')}</p>}
       {!embedded&&<fieldset disabled={disabled || loading}><legend>{t("setup.mode")}</legend>
         {(["L", "T"] as const).map(value => <label key={value}><input type="radio" name="mode" checked={mode === value} onChange={() => setMode(value)}/>{t(value === "L" ? "courses.learn" : "courses.test")}</label>)}
       </fieldset>}
@@ -66,7 +71,7 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
       </fieldset>
       <label className="difficulty-toggle"><input type="checkbox" name="difficultOnly" disabled={disabled || loading} checked={config.difficultOnly ?? false} onChange={e=>setConfig(c=>({...c,difficultOnly:e.target.checked}))}/>{t("difficulties.only")}</label>
       <details><summary>{t("setup.advanced")}</summary>
-        <fieldset disabled={disabled || loading}><legend>{t("setup.kinds")}</legend>{choices.kinds.map(k => <label key={k.value}><input type="checkbox" checked={(config.kinds ?? choices.kinds.map(v => v.value)).includes(k.value)} onChange={() => setConfig(c => ({...c, kinds: toggle(c.kinds ?? choices.kinds.map(v => v.value), k.value)}))}/>{t(k.value === "input" ? "setup.input" : "setup.choice")}</label>)}</fieldset>
+        <fieldset disabled={disabled || loading}><legend>{t("setup.kinds")}</legend>{choices.kinds.map(k => <label key={k.value}><input type="checkbox" checked={(config.kinds ?? choices.kinds.map(v => v.value)).includes(k.value)} onChange={() => setConfig(c => ({...c, kinds: toggle(c.kinds ?? choices.kinds.map(v => v.value), k.value)}))}/>{(k.value === "input" || k.value === "choice") ? t(k.value === "input" ? "setup.input" : "setup.choice") : kindLabel(locale,k.value)}</label>)}</fieldset>
         {choices.directions.length > 0 && <fieldset disabled={disabled || loading}><legend>{t("setup.directions")}</legend>{choices.directions.map(d => <label key={d.value} dir="auto"><input type="checkbox" checked={(config.directions ?? choices.directions.map(v => v.value)).includes(d.value)} onChange={() => setConfig(c => ({...c, directions: toggle(c.directions ?? choices.directions.map(v => v.value), d.value)}))}/>{directionKeys[d.value] ? translate(locale, directionKeys[d.value]) : d.value}</label>)}</fieldset>}
         {choices.filters.length > 0 && <fieldset disabled={disabled || loading}><legend>{t("setup.filters")}</legend>{choices.filters.map(f => <div key={f.field}><h3 dir="auto">{f.field}</h3>{f.values.map(value => <label key={value} dir="auto"><input type="checkbox" checked={(config.filters?.find(v => v.field === f.field)?.values ?? f.values).includes(value)} onChange={() => setConfig(c => ({...c, filters: [...(c.filters ?? []).filter(v => v.field !== f.field), {field: f.field, values: toggle(c.filters?.find(v => v.field === f.field)?.values ?? f.values, value)}]}))}/>{value}</label>)}</div>)}</fieldset>}
       </details>
@@ -74,7 +79,7 @@ export function CourseSetupPage({id, disabled, onStart, onBack, initial, onPrefe
       {!loading && !failed && max === 0 && <p role="alert">{t("setup.empty")}</p>}
       {!loading && !failed && max > 0 && !valid && <p role="alert">{t("setup.range", {max: limit})}</p>}
       {mode === "T" && metadata?.testSubmitted && <p role="status">{t("activity.submitted")}</p>}
-      <button className="gold-button" disabled={disabled || loading || failed || !valid || max === 0 || (mode === "T" && metadata?.testSubmitted)} onClick={() => onStart(mode, metadata!.course.title, {...config, itemCount: all ? null : Number(quantity)})}>{t("setup.start")}</button>
+      <button className="gold-button" disabled={disabled || loading || failed || !valid || max === 0 || (mode === "T" && (metadata?.testSubmitted || choices?.testAvailable===false))} onClick={() => onStart(mode, metadata!.course.title, {...config, itemCount: all ? null : Number(quantity)})}>{t("setup.start")}</button>
     </>}
   </section></div>;
 }

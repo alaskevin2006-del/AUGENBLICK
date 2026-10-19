@@ -3,7 +3,7 @@
 import random
 from collections import Counter
 from rest_framework.exceptions import ValidationError
-from .runtime import build_questions
+from .engines.registry import build_questions
 
 
 def select_questions(payload, data, seed=0, difficult_object_ids=None):
@@ -53,14 +53,24 @@ def select_questions(payload, data, seed=0, difficult_object_ids=None):
     # destroy valid distractors; constrain the target object before sampling.
     # Eligibility must not change with a session seed (ambiguous media variants
     # may otherwise make a displayed direction disappear at start).
-    bank = build_questions(payload, 0)
-    random.Random(seed).shuffle(bank)
+    bank = build_questions(payload, 0 if payload.get('engine','znawca')=='znawca' else seed)
+    if payload.get('engine') != 'companion':
+        random.Random(seed).shuffle(bank)
+    checkpoint = data.get('checkpoint')
+    if checkpoint is not None:
+        checkpoints = payload.get('checkpoints', [])
+        entry = next((c for c in checkpoints if c['id'] == checkpoint), None)
+        if payload.get('engine') != 'companion' or entry is None:
+            raise ValidationError('Unknown checkpoint.')
+        start = next((i for i,q in enumerate(bank) if q['objectId'] == entry['objectId']), None)
+        if start is None: raise ValidationError('Invalid checkpoint.')
+        bank = bank[start:]
     all_directions = {q["direction"] for q in bank}
     scoped = [q for q in bank if q["objectId"] in objects]
     kinds = data.get("kinds")
     directions = data.get("directions")
     for name, value, allowed in [
-        ("kinds", kinds, {"input", "choice"}),
+        ("kinds", kinds, ({"input", "choice"} if payload.get('engine','znawca')=='znawca' else {q['kind'] for q in bank})),
         ("directions", directions, all_directions),
     ]:
         if name in data and (
@@ -84,7 +94,7 @@ def select_questions(payload, data, seed=0, difficult_object_ids=None):
         ],
         "directions": [
             {"value": key, "count": count}
-            for key, count in sorted(Counter(q["direction"] for q in scoped).items())
+            for key, count in sorted(Counter(q["direction"] for q in scoped if q['direction']).items())
         ],
         "filters": [
             {"field": field, "values": values} for field, values in options.items()
@@ -95,5 +105,6 @@ def select_questions(payload, data, seed=0, difficult_object_ids=None):
         "directions": directions,
         "filters": filters,
         "difficultOnly": difficult_only,
+        "checkpoint": checkpoint,
     }
     return selected, metadata, selection

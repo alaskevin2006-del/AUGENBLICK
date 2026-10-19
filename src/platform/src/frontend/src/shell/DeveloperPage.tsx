@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import {AuthorTemplates} from '../engines/AuthorTemplates';
 import {
   ApiError,
   type CourseSummary,
@@ -113,6 +114,7 @@ export function DeveloperPage({
               </button>
             </div>
           </div>
+          <AuthorTemplates/>
           {file && (
             <p className="selected-file" dir="auto">
               {file.name}

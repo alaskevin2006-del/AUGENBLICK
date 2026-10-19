@@ -108,7 +108,8 @@ class CourseSetupView(AuthenticatedView):
         ).exists()
         if not request.user.is_staff and not enrolled:
             raise PermissionDenied("Join this course before learning.")
-        if course.engine != "znawca":
+        from .engines.registry import SUPPORTED
+        if course.engine not in SUPPORTED:
             raise ValidationError("This engine is not available yet.")
         from .records_views import difficult_objects
 
@@ -123,6 +124,9 @@ class CourseSetupView(AuthenticatedView):
         return Response(
             {
                 "course": course_summary(course, enrolled),
+                "checkpoints": course.payload.get('checkpoints',[]),
+                "testAvailable": course.engine != 'companion',
+                "hasReference": bool(course.payload.get('reference')),
                 **metadata,
                 "testSubmitted": not request.user.is_staff
                 and Session.objects.filter(
@@ -134,3 +138,15 @@ class CourseSetupView(AuthenticatedView):
                 ).exists(),
             }
         )
+
+
+class CourseReferenceView(AuthenticatedView):
+    def get(self,request,course_version_id):
+        from .models import Session
+        from rest_framework.exceptions import NotFound
+        course=get_object_or_404(CourseVersion,pk=course_version_id)
+        if not request.user.is_staff and (course.status!='published' or not Enrollment.objects.filter(user=request.user,course_version=course).exists()):
+            raise NotFound('Course not found.')
+        if Session.objects.filter(user=request.user,course_version=course,mode='T',status='active',is_preview=request.user.is_staff).exists():
+            raise PermissionDenied('Reference is unavailable during a test.')
+        return Response(course.payload.get('reference',{}))

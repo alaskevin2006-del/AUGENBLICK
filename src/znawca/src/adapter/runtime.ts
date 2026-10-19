@@ -1,10 +1,14 @@
 import type { AnswerEvaluation, Question } from "../core/quiz/types";
 export type PublicQuestion = Omit<Question, "acceptedAnswers" | "options"> & {
+  readonly engine?: string;
+  readonly interaction?: Record<string, any>;
   readonly speechUrls?: readonly string[];
   readonly options?: readonly (NonNullable<Question["options"]>[number] & {readonly speechUrl?: string})[];
 };
-export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; readonly needsAnother?: boolean; }
+export interface RuntimeFeedback extends AnswerEvaluation { readonly submissionId: string; readonly correctAnswers: readonly string[]; readonly needsAnother?: boolean; readonly submittedLabels?: readonly string[]; readonly dimensions?: readonly {id:string;label:string;score:number}[]; readonly [key:string]: any; }
 export interface RuntimeSnapshot {
+  readonly engine?: string;
+  readonly interactionFeedback?: RuntimeFeedback | null;
   readonly isPreview?: boolean;
   readonly sessionId: string;
   readonly courseVersionId: string;
@@ -20,6 +24,7 @@ export interface RuntimeSnapshot {
 }
 export interface AnswerRequest { readonly submissionId: string; readonly questionId: string; readonly answer: string; }
 export interface RuntimeApi {
+  practice?(sessionId:string,questionId:string,answer:string):Promise<RuntimeFeedback>;
   answer(sessionId: string, request: AnswerRequest): Promise<RuntimeSnapshot>;
   advance(sessionId: string, action: "next" | "finish" | "skip", questionId?: string, submissionId?: string): Promise<RuntimeSnapshot>;
 }

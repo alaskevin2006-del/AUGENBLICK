@@ -3,6 +3,8 @@ from django.urls import path
 from . import auth_views, dev_views, views, catalog_views, records_views
 
 urlpatterns = [
+    path('courses/<str:course_version_id>/reference/',catalog_views.CourseReferenceView.as_view()),
+    path('sessions/<uuid:session_id>/practice/',views.SessionPracticeView.as_view()),
     path("record-courses/", records_views.RecordCoursesView.as_view()),
     path(
         "courses/<str:course_version_id>/records/",

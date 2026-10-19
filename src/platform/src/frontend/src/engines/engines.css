@@ -1,0 +1,3 @@
+.engine-activity{box-sizing:border-box;width:min(100%,1000px);margin:0 auto;padding:24px;overflow:auto;height:100%;color:var(--text-primary,#eee9d3)}
+.engine-activity h2,.engine-replay h3{margin:12px 0 24px}.engine-activity button{margin:8px 8px 8px 0}.engine-feedback{margin:24px 0;padding:16px;border:1px solid #3e5749}.engine-replay{min-width:0}.engine-replay fieldset{border:0;padding:0}.engine-reference{padding:20px 0}
+.author-templates{margin:0 0 20px}.author-templates a{display:inline-block;color:#d3b25c;margin:12px 24px 0 0}

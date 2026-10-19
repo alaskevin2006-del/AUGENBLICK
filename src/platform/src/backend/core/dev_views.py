@@ -48,7 +48,12 @@ class CourseUploadView(APIView):
                 except (NotImplementedError, RuntimeError):
                     return Response({"error": "不支持的压缩格式", "detail": "请使用普通 ZIP（Deflate 或不压缩），不要加密。"},
                                     status=http.HTTP_400_BAD_REQUEST)
-                result = import_course_dir(_locate_course_dir(tmp_path))
+                course_dir = _locate_course_dir(tmp_path)
+                if (course_dir / 'course.json').is_file():
+                    from .engine_importer import import_engine_dir
+                    result = import_engine_dir(course_dir)
+                else:
+                    result = import_course_dir(course_dir)
         except CourseImportError as e:
             return Response({"error": e.error, "detail": e.detail}, status=http.HTTP_400_BAD_REQUEST)
         return Response(result)
@@ -75,6 +80,8 @@ def _safe_extract(zf: zipfile.ZipFile, target: Path):
 def _locate_course_dir(root: Path) -> Path:
     """容忍 ZIP 根下包一层子目录：根无 xlsx 且只有一个含 xlsx 的子目录时下钻。"""
     def has_xlsx(d: Path) -> bool:
+        if (d / 'course.json').is_file():
+            return True
         return any(p.is_file() and p.suffix.lower() == ".xlsx" and not p.name.startswith("~$")
                    for p in d.iterdir())
 

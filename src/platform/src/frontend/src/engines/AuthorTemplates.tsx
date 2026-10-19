@@ -1,0 +1,2 @@
+import {useLocale} from '../i18n';
+export function AuthorTemplates(){const locale=useLocale();const text=({'zh-CN':'课程模板',en:'Course templates',pl:'Szablony kursów',ru:'Шаблоны курсов',ar:'قوالب الدورات'} as Record<string,string>)[locale];return <details className="author-templates"><summary>{text}</summary><div>{[['anvil','Anvil'],['ekspert','Ekspert'],['sokole-oko','Sokole Oko'],['companion','Companion']].map(([key,label])=><a key={key} href={`/templates/${key}.zip`} download>{label}</a>)}</div></details>;}

@@ -59,6 +59,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 class HttpBackend implements BackendApi {
+  courseReference(id:string):Promise<any>{return request(`/api/courses/${encodeURIComponent(id)}/reference/`);}
+  practice(sessionId:string,questionId:string,answer:string):Promise<import('@znawca/adapter/runtime').RuntimeFeedback>{return request(`/api/sessions/${sessionId}/practice/`,{method:'POST',body:JSON.stringify({questionId,answer})});}
   login(username: string, password: string): Promise<LoginResponse> {
     return request("/api/auth/login/", {
       method: "POST",

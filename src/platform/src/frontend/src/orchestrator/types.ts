@@ -29,6 +29,7 @@ export interface SessionInfo {
 }
 
 export interface CreateSessionRequest {
+  readonly checkpoint?: number;
   readonly courseVersionId: string;
   readonly mode: "L" | "T";
   readonly itemCount?: number | null;
@@ -90,6 +91,8 @@ export class ApiError extends Error {
 
 /** 编排器对后端的全部依赖（契约§三/§八/§九端点；mock 后端实现同一接口）。 */
 export interface BackendApi {
+  courseReference?(id:string):Promise<any>;
+  practice?(sessionId:string,questionId:string,answer:string):Promise<import('@znawca/adapter/runtime').RuntimeFeedback>;
   login(username: string, password: string): Promise<LoginResponse>;
   logout(): Promise<void>;
   me(): Promise<AuthUser>;
@@ -134,8 +137,11 @@ export interface UploadProgress {
 }
 
 export interface CourseFilter { readonly field: string; readonly values: readonly string[] }
-export interface SetupConfig { readonly difficultOnly?: boolean; readonly kinds?: readonly string[]; readonly directions?: readonly string[]; readonly filters?: readonly CourseFilter[] }
+export interface SetupConfig { readonly checkpoint?: number; readonly difficultOnly?: boolean; readonly kinds?: readonly string[]; readonly directions?: readonly string[]; readonly filters?: readonly CourseFilter[] }
 export interface CourseSetup {
+ readonly checkpoints?: readonly {id:number;objectId:string;label?:string}[];
+ readonly testAvailable?:boolean;
+ readonly hasReference?:boolean;
  readonly course: CourseSummary;
  readonly availableQuestionCount: number;
  readonly availableObjectCount: number;

@@ -3,6 +3,7 @@ from collections.abc import Mapping
 import random
 import time
 import uuid
+import hashlib
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, connection, DatabaseError
@@ -15,7 +16,7 @@ from rest_framework.views import APIView
 from .models import CourseVersion, Enrollment, Event, Session, Submission
 from .runtime import initial_state, public_question, snapshot
 from .selection import select_questions
-from .scoring import evaluate
+from .engines.registry import evaluate, SUPPORTED
 
 
 class Conflict(APIException):
@@ -153,11 +154,13 @@ class SessionListView(AuthenticatedView):
             ).exists()
         ):
             raise PermissionDenied("Join this course before learning.")
-        if course.engine != "znawca":
+        if course.engine not in SUPPORTED:
             raise ValidationError("This engine is not available yet.")
         mode = request.data.get("mode")
         if mode not in ("L", "T"):
             raise ValidationError("mode must be L or T.")
+        if course.engine == 'companion' and mode == 'T':
+            raise ValidationError('Pronunciation testing requires a calibrated phoneme evaluator; this course supports practice only.')
         sessions = Session.objects.filter(
             user=request.user, course_version=course, mode=mode, is_preview=preview
         )
@@ -227,13 +230,14 @@ class SessionAnswerView(AuthenticatedView):
         question_id = request.data.get("questionId")
         if (
             not isinstance(answer, str)
-            or len(answer) > 10000
+            or len(answer) > (3*1024*1024 if s.course_version.engine=='companion' else 10000)
             or not isinstance(question_id, str)
         ):
             raise ValidationError("A questionId and text answer are required.")
         prior = Submission.objects.filter(session=s, submission_id=token).first()
+        stored_answer = ('sha256:'+hashlib.sha256(answer.encode()).hexdigest()) if s.course_version.engine=='companion' else answer
         if prior:
-            if prior.question_id != question_id or prior.answer != answer:
+            if prior.question_id != question_id or prior.answer != stored_answer:
                 raise Conflict("submissionId was already used for another answer.")
             return Response(prior.response)
         state = s.runtime
@@ -245,16 +249,16 @@ class SessionAnswerView(AuthenticatedView):
         ):
             raise Conflict("This question is not awaiting an answer.")
         q = state["questions"][question_id]
-        feedback = evaluate(
-            answer,
-            q["acceptedAnswers"],
-            subscript_compatible=bool(
-                s.course_version.payload.get("answerRules", {}).get(
-                    "subscriptCompatible", False
-                )
-            ),
-        )
+        feedback = evaluate(q, answer, s.course_version.payload)
         feedback["submissionId"] = str(token)
+        if feedback.pop('pending',False):
+            state['interactionFeedback']=feedback
+            s.save(update_fields=['runtime','updated_at'])
+            record(s,'interactionUpdated',{'questionId':question_id,'submissionId':str(token)})
+            result=snapshot(s)
+            Submission.objects.create(session=s,submission_id=token,question_id=question_id,answer=stored_answer,response=result)
+            return Response(result)
+        state['interactionFeedback']=None
         feedback["correctAnswerLabels"] = [
             q.get("answerLabels", {}).get(v, v) for v in feedback["correctAnswers"]
         ]
@@ -287,18 +291,18 @@ class SessionAnswerView(AuthenticatedView):
             ]
         state["feedback"] = feedback
         state["review"].append(
-            {"question": public_question(q), "answer": answer, "feedback": feedback}
+            {"question": public_question(q), "answer": '[recording]' if s.course_version.engine=='companion' else answer, "feedback": feedback}
         )
         s.save(update_fields=["runtime", "updated_at"])
         record(
-            s, "itemResolved", {"questionId": question_id, "answer": answer, **feedback}
+            s, "itemResolved", {"questionId": question_id, "answer": '[recording]' if s.course_version.engine=='companion' else answer, **feedback}
         )
         result = snapshot(s)
         Submission.objects.create(
             session=s,
             submission_id=token,
             question_id=question_id,
-            answer=answer,
+            answer=stored_answer,
             response=result,
         )
         return Response(result)
@@ -323,6 +327,11 @@ class SessionNextView(AuthenticatedView):
             and state["feedback"].get("submissionId") == submission_id
         ):
             qid = state["queue"].pop(0)
+            current=state['questions'][qid]
+            if current.get('engine')=='sokole-oko':
+                for key in ('found','points','resolved'):current['solution'].pop(key,None)
+            if current.get('kind')=='anvil-8':
+                random.Random(s.random_seed+len(state['review'])).shuffle(current['interaction'].get('options',[]))
             if qid not in state["mastered"]:
                 # Repeat failed learning questions at a reproducibly randomized position.
                 # Keep at least one other pending question ahead when possible.
@@ -330,6 +339,7 @@ class SessionNextView(AuthenticatedView):
                 position = rng.randint(1, len(state["queue"])) if state["queue"] else 0
                 state["queue"].insert(position, qid)
             state["feedback"] = None
+            state['interactionFeedback'] = None
             s.save(update_fields=["runtime", "updated_at"])
             if state["queue"]:
                 record(s, "itemStarted", {"questionId": state["queue"][0]})
@@ -348,6 +358,7 @@ class SessionFinishView(AuthenticatedView):
             raise Conflict("Answer all questions before submitting.")
         scores = [r["feedback"]["score"] for r in s.runtime["review"]]
         s.total_score = sum(scores) / len(scores) if s.mode == "T" else 1.0
+        if s.course_version.engine=='companion':s.total_score=None
         s.status = "finished"
         s.save(update_fields=["total_score", "status", "updated_at"])
         record(
@@ -385,6 +396,20 @@ class SessionSkipView(AuthenticatedView):
             },
         )
         return Response(snapshot(s))
+
+
+class SessionPracticeView(AuthenticatedView):
+    @transaction.atomic
+    def post(self,request,session_id):
+        s=owned(request,session_id,lock=True)
+        qid=request.data.get('questionId'); answer=request.data.get('answer')
+        if s.course_version.engine!='companion' or s.mode!='L' or s.status!='active' or not s.runtime.get('queue') or s.runtime['queue'][0]!=qid:
+            raise Conflict('This practice row is not active.')
+        if not isinstance(answer,str) or len(answer)>3*1024*1024:
+            raise ValidationError('Invalid recording.')
+        import copy
+        result=evaluate(copy.deepcopy(s.runtime['questions'][qid]),answer,s.course_version.payload)
+        return Response(result)
 
 
 class HealthView(APIView):

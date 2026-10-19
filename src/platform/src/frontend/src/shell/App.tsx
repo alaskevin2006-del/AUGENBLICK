@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ZnawcaActivity } from "@znawca/adapter/ZnawcaActivity";
+import { EngineActivity } from "../engines/EngineActivity";
 import {
   getBackend,
   resetBackend,
@@ -250,7 +250,7 @@ export function App() {
         onLogout={logout}
         onExit={close}
       >
-        <ZnawcaActivity
+        <EngineActivity
           key={activity.sessionId}
           courseTitle={activity.courseTitle}
           initialSnapshot={activity.snapshot}

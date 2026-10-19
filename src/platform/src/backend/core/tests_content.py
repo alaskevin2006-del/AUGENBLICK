@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from openpyxl import Workbook
 
 from .importer import import_course_dir
+from .models import CourseVersion
 
 
 class ContentVersionTests(TestCase):
@@ -38,7 +39,21 @@ class ContentVersionTests(TestCase):
         (self.source / "media" / "bird.png").write_bytes(b"second-image")
         second = self.version()
         self.assertNotEqual(first["courseVersionId"], second["courseVersionId"])
-        self.assertEqual((self.root / "published" / first["courseVersionId"] / "bird.png").read_bytes(), b"first-image")
+        url = CourseVersion.objects.get(pk=first["courseVersionId"]).payload["items"][0]["media"][0]["url"]
+        self.assertEqual((self.root / "published" / url.removeprefix("/media/")).read_bytes(), b"first-image")
+
+    def test_public_asset_urls_hide_source_names_and_speech_coordinates(self):
+        speech = self.source / "speech" / "en"
+        speech.mkdir(parents=True)
+        (speech / "B2.mp3").write_bytes(b"spoken-answer")
+        version = self.version()
+        payload = CourseVersion.objects.get(pk=version["courseVersionId"]).payload
+        image = payload["items"][0]["media"][0]["url"]
+        audio = payload["speech"][0]["url"]
+        self.assertNotIn("bird.png", image)
+        self.assertNotIn("B2", audio)
+        self.assertNotIn("speech/en", audio)
+        self.assertEqual((self.root / "published" / audio.removeprefix("/media/")).read_bytes(), b"spoken-answer")
 
     def test_same_named_speech_change_creates_version(self):
         speech = self.source / "speech" / "en"

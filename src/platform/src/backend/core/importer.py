@@ -118,7 +118,14 @@ def _build_media_index(media_dir: Path) -> dict:
     """文件名（小写）→ 原始文件名；目录不存在视为无媒体。"""
     if not media_dir.is_dir():
         return {}
-    return {p.name.lower(): p.name for p in media_dir.iterdir() if p.is_file()}
+    return {p.name.lower(): p.name for p in media_dir.iterdir() if p.is_file() and p.suffix.lower() in MEDIA_EXTENSIONS}
+
+
+def _public_asset_name(path: Path) -> str:
+    """Do not disclose names or spreadsheet coordinates that identify an answer."""
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    return digest + path.suffix.lower()
 
 
 def _content_hash(workbook: Path, media_index: dict, speech_files: list, feedback: list, lang: str) -> str:
@@ -218,7 +225,8 @@ def _import_workbook(course_dir, workbook, base, lang, media_index, feedback) ->
                 if not real:
                     warnings.append(f"第 {row_no} 行第 {col_no} 列引用的媒体 '{ref}' 不在 media/ 中，已跳过。")
                     continue
-                assets.append({"kind": kind, "url": f"/media/{version_id}/{real}", "_file": real})
+                public_name = _public_asset_name(course_dir / "media" / real)
+                assets.append({"kind": kind, "url": f"/media/{version_id}/{public_name}", "_file": real})
             return (kind if assets else "text", [], assets)
 
         main_media, main_kind = [], None
@@ -271,13 +279,14 @@ def _import_workbook(course_dir, workbook, base, lang, media_index, feedback) ->
     target = Path(settings.MEDIA_ROOT) / version_id
     target.mkdir(parents=True, exist_ok=True)
     for real in media_index.values():
-        shutil.copy2(course_dir / "media" / real, target / real)
+        source = course_dir / "media" / real
+        shutil.copy2(source, target / _public_asset_name(source))
     for name in speech_files:
-        dest = target / "speech" / lang
-        dest.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(speech_dir / name, dest / name)
+        source = speech_dir / name
+        shutil.copy2(source, target / _public_asset_name(source))
     for name in feedback:
-        shutil.copy2(course_dir / name, target / name)
+        source = course_dir / name
+        shutil.copy2(source, target / _public_asset_name(source))
 
     payload = {
         "schemaVersion": "0.3",
@@ -289,12 +298,12 @@ def _import_workbook(course_dir, workbook, base, lang, media_index, feedback) ->
         "columns": columns,
         "items": items,
         "speech": [
-            {"coord": Path(n).stem, "url": f"/media/{version_id}/speech/{lang}/{n}"}
+            {"coord": Path(n).stem, "url": f"/media/{version_id}/{_public_asset_name(speech_dir / n)}"}
             for n in speech_files
         ],
         "feedbackSounds": {
-            "correct": [f"/media/{version_id}/{n}" for n in feedback if n.lower().startswith("correct")],
-            "incorrect": [f"/media/{version_id}/{n}" for n in feedback if n.lower().startswith("incorrect")],
+            "correct": [f"/media/{version_id}/{_public_asset_name(course_dir / n)}" for n in feedback if n.lower().startswith("correct")],
+            "incorrect": [f"/media/{version_id}/{_public_asset_name(course_dir / n)}" for n in feedback if n.lower().startswith("incorrect")],
         },
     }
     CourseVersion.objects.create(

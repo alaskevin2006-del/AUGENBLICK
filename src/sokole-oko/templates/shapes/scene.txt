@@ -1,0 +1,2 @@
+ZH-S: 找到图中的两个图形。
+EN: Find both shapes.

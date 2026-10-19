@@ -1,0 +1,2 @@
+ZH-S: 请指出圆形。
+EN: Select the circle.

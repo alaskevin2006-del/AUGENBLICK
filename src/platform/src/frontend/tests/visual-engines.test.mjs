@@ -1,0 +1,14 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {build} from 'esbuild';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+let mod,temp;
+before(async()=>{temp=await mkdtemp(path.resolve('node_modules/.visual-test-'));const outfile=path.join(temp,'visual.mjs');await build({stdin:{contents:"export {EkspertQuestion,EkspertAtlas} from './src/engines/EkspertQuestion'; export {SokoleQuestion} from './src/engines/SokoleQuestion';",resolveDir:process.cwd(),loader:'ts'},outfile,bundle:true,platform:'node',format:'esm',jsx:'automatic',external:['react','react/jsx-runtime']});mod=await import(pathToFileURL(outfile));});
+after(async()=>{await rm(temp,{recursive:true,force:true});});
+test('Ekspert preserves boolean value types and other axes',()=>{let answer;const view=Renderer.create(React.createElement(mod.EkspertQuestion,{question:{kind:'ekspert-multi',prompt:'Classify',interaction:{axes:[{id:'flag',name:'Flag',type:'boolean',values:[true,false]}]}},answer:'{"axes":{"other":"kept"}}',onChange:v=>answer=v,disabled:false,locale:'zh'}));view.root.findByType('select').props.onChange({target:{value:'false'}});assert.deepEqual(JSON.parse(answer),{axes:{other:'kept',flag:false}});view.unmount();});
+test('Sokole maps scaled pointer and keyboard to normalized coordinates',()=>{let answer;let view;act(()=>{view=Renderer.create(React.createElement(mod.SokoleQuestion,{question:{kind:'sokole-observation',prompt:'Find',interaction:{media:{path:'/image.png'},width:100,height:50,targetCount:2}},answer:'',onChange:()=>{},onCommit:v=>answer=JSON.parse(v),disabled:false,locale:'en'}));});const canvas=()=>view.root.findByProps({role:'button'});act(()=>canvas().props.onClick({clientX:110,clientY:70,currentTarget:{getBoundingClientRect:()=>({left:10,top:20,width:200,height:100})}}));assert.deepEqual(answer,{x:.5,y:.5});act(()=>canvas().props.onKeyDown({key:'ArrowRight',shiftKey:true,preventDefault(){}}));act(()=>canvas().props.onKeyDown({key:'Enter',preventDefault(){}}));assert.equal(answer.x,.55);view.unmount();});
+test('Sokole disabled replay never submits and renders permitted overlays only',()=>{let calls=0;const view=Renderer.create(React.createElement(mod.SokoleQuestion,{question:{kind:'sokole-observation',prompt:'Find',interaction:{media:{path:'/image.png'},width:100,height:100,targetCount:2}},answer:'',onChange:()=>calls++,onCommit:()=>calls++,disabled:true,locale:'en',feedback:{foundCount:1,overlays:[{id:'one',path:'data:image/png;base64,AA=='}]}}));const canvas=view.root.findByProps({role:'button'});canvas.props.onKeyDown({key:'Enter',preventDefault(){}});assert.equal(calls,0);assert.equal(view.root.findAllByType('img').length,2);view.unmount();});

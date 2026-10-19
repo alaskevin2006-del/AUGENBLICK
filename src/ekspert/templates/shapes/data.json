@@ -1,0 +1,8 @@
+{
+  "module":{"id":"shapes","axes":[{"id":"shape","name":"形状","type":"enum","values":["圆形","正方形","三角形"]},{"id":"filled","name":"实心","type":"boolean"}]},
+  "records":[
+    {"id":"circle-filled","name":"实心圆","axes":{"shape":"圆形","filled":true},"media":{"svg":"circle.svg"},"features":{"说明":"圆形没有顶点。"}},
+    {"id":"square-outline","name":"空心正方形","axes":{"shape":"正方形","filled":false},"media":{"svg":"square.svg"},"features":{"说明":"正方形有四条相等的边。"}},
+    {"id":"triangle-filled","name":"实心三角形","axes":{"shape":"三角形","filled":true},"media":{"svg":"triangle.svg"},"features":{"说明":"三角形有三个顶点。"}}
+  ]
+}

@@ -33,3 +33,9 @@
 ## 产品基线
 
 - 平台 + 5 引擎 + Direct 保留位的权威基线在 `docs/baseline/`，各子项目开工前必读对应基线文件（共性约束见 `docs/baseline/README.md`）。
+
+## 在线试点（2026-10-19）
+
+- [打开 AUGENBLICK](https://124.221.230.69:18443/)：当前为 Znawca 学习/测试试点，包含一节演示课程；完整平台及其他引擎仍在后续范围。
+- [交付、验收和下一步](docs/releases/2026-10-19-pilot.md) · [部署与回滚](src/platform/deploy/README.md) · [全局进度](docs/进度.md)。
+- 管理账号凭证仅在本机 `AUGENBLICK-access.local` 保存，不进入仓库。

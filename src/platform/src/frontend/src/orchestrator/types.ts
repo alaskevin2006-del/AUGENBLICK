@@ -1,4 +1,5 @@
 import type { CourseVersionPayload } from "@znawca/datasource/payload";
+import type { RuntimeSnapshot, AnswerRequest } from "@znawca/adapter/runtime";
 import type { EngineEvent } from "@znawca/adapter/ZnawcaActivity";
 
 /** 契约§三：课程版本列表条目。 */
@@ -86,8 +87,10 @@ export interface BackendApi {
   me(): Promise<AuthUser>;
   listCourses(): Promise<readonly CourseSummary[]>;
   getPayload(courseVersionId: string): Promise<CourseVersionPayload>;
-  createSession(request: CreateSessionRequest): Promise<CreateSessionResponse>;
-  getSession(sessionId: string): Promise<SessionInfo>;
+  createSession(request: CreateSessionRequest): Promise<RuntimeSnapshot>;
+  answer(sessionId: string, request: AnswerRequest): Promise<RuntimeSnapshot>;
+  advance(sessionId: string, action: "next" | "finish" | "skip"): Promise<RuntimeSnapshot>;
+  getSession(sessionId: string): Promise<RuntimeSnapshot>;
   findActiveSession(courseVersionId: string): Promise<SessionInfo | null>;
   pushEvents(sessionId: string, events: readonly EngineEvent[], resumeToken?: unknown): Promise<PushEventsResponse>;
   uploadCourse(file: File): Promise<UploadResult>;

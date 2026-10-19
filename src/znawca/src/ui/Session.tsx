@@ -198,9 +198,14 @@ function FeedbackDetails({ evaluation, question }: { evaluation: AnswerEvaluatio
 }
 
 export interface SessionViewProps {
-  readonly question: Question;
+  readonly question: Question & {
+    readonly speechUrls?: readonly string[];
+    readonly options?: readonly (QuestionOption & {readonly speechUrl?: string})[];
+  };
   readonly courseTitle: string;
-  readonly speechCourse: Course;
+  readonly speechCourse?: Course;
+  readonly disabled?: boolean;
+  readonly nextLabel?: string;
   readonly mode: "L" | "T";
   readonly position: number;
   readonly total: number;
@@ -221,11 +226,11 @@ export function SessionView(props: SessionViewProps) {
   const directionLabel = directionLabels.find(([direction]) => direction === question.direction)?.[1];
   // D-22：文字题的问题朗读链与文字选项的手动朗读（无 speech 资源时为空链/不渲染按钮）。
   const questionSpeech = useMemo(
-    () => (question.media ? [] : speechAudioForQuestion(props.speechCourse, question)),
+    () => question.speechUrls ?? (question.media || !props.speechCourse ? [] : speechAudioForQuestion(props.speechCourse, question)),
     [props.speechCourse, question],
   );
-  const optionSpeechUrl = (option: QuestionOption): string | undefined =>
-    speechAudioForOption(props.speechCourse, question, option);
+  const optionSpeechUrl = (option: QuestionOption & {readonly speechUrl?: string}): string | undefined =>
+    option.speechUrl ?? (props.speechCourse ? speechAudioForOption(props.speechCourse, question, option) : undefined);
   const units = props.units;
   return (
     <div className="session-page" dir={textDirection(lang)}>
@@ -260,9 +265,9 @@ export function SessionView(props: SessionViewProps) {
           <h1 dir="auto">{promptText(question, t)}</h1>
           {!question.media && questionSpeech.length > 0 && <SpeechButton onPlay={() => playAudioChain(questionSpeech)} />}
         </div>
-        {question.media && <QuestionMedia media={question.media} />}
+        {question.media && <QuestionMedia key={question.media.path} media={question.media} />}
         {question.kind === "choice" ? (
-          <fieldset className={`choice-list${isMediaGridOptions(question) ? " media-grid" : ""}`} disabled={Boolean(props.feedback)}>
+          <fieldset className={`choice-list${isMediaGridOptions(question) ? " media-grid" : ""}`} disabled={props.disabled || Boolean(props.feedback)}>
             <legend>{t("yourAnswer")}</legend>
             {question.options?.map((option, index) => (
               <QuestionChoice
@@ -285,7 +290,7 @@ export function SessionView(props: SessionViewProps) {
               onChange={(event) => props.setAnswer(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && props.onSubmit()}
               placeholder={t("yourAnswer")}
-              disabled={Boolean(props.feedback)}
+              disabled={props.disabled || Boolean(props.feedback)}
             />
           </label>
         )}
@@ -311,9 +316,9 @@ export function SessionView(props: SessionViewProps) {
         )}
         <div className="question-actions">
           {!props.feedback ? (
-            <button className="gold-button" onClick={props.onSubmit}>{t("checkAnswer")}</button>
+            <button className="gold-button" disabled={props.disabled} onClick={props.onSubmit}>{t("checkAnswer")}</button>
           ) : (
-            <button className="gold-button" onClick={props.onNext}>{t("nextQuestion")}</button>
+            <button className="gold-button" disabled={props.disabled} onClick={props.onNext}>{props.nextLabel ?? t("nextQuestion")}</button>
           )}
         </div>
       </article>

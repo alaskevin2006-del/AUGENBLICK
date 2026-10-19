@@ -6,16 +6,15 @@ import {
   type BackendApi,
   type CourseSummary,
   type CreateSessionRequest,
-  type CreateSessionResponse,
   type LoginResponse,
   type PushEventsResponse,
   type SessionInfo,
   type UploadResult,
 } from "./types";
 import { clearAuth, getToken } from "./auth";
-import { MockBackend } from "../dev/mockBackend";
+import type { RuntimeSnapshot, AnswerRequest } from "@znawca/adapter/runtime";
 
-// 契约§三/§八/§九 REST client。开发期后端不可用时自动降级到 MockBackend（localStorage）。
+// Authenticated REST client; errors remain visible to the learner.
 
 /** 统一 401 处理：App 注册——清 token、跳登录页。 */
 let unauthorizedHandler: (() => void) | null = null;
@@ -67,13 +66,19 @@ class HttpBackend implements BackendApi {
     return request(`/api/courses/${encodeURIComponent(courseVersionId)}/payload/`);
   }
 
-  createSession(body: CreateSessionRequest): Promise<CreateSessionResponse> {
+  createSession(body: CreateSessionRequest): Promise<RuntimeSnapshot> {
     return request("/api/sessions/", { method: "POST", body: JSON.stringify(body) });
   }
 
-  async getSession(sessionId: string): Promise<SessionInfo> {
-    const raw = await request<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(sessionId)}/`);
-    return normalizeSession(raw);
+  answer(sessionId: string, body: AnswerRequest): Promise<RuntimeSnapshot> {
+    return request(`/api/sessions/${encodeURIComponent(sessionId)}/answer/`, {method: "POST", body: JSON.stringify(body)});
+  }
+  advance(sessionId: string, action: "next" | "finish" | "skip"): Promise<RuntimeSnapshot> {
+    return request(`/api/sessions/${encodeURIComponent(sessionId)}/${action}/`, {method: "POST"});
+  }
+
+  getSession(sessionId: string): Promise<RuntimeSnapshot> {
+    return request(`/api/sessions/${encodeURIComponent(sessionId)}/`);
   }
 
   async findActiveSession(courseVersionId: string): Promise<SessionInfo | null> {
@@ -121,37 +126,8 @@ function normalizeSession(raw: Record<string, unknown>): SessionInfo {
 
 let cached: Promise<BackendApi> | undefined;
 
-/** 开发期强制 mock 开关：localStorage `augenblick.dev.forceMock` = "1"。 */
-function isForceMock(): boolean {
-  try {
-    return localStorage.getItem("augenblick.dev.forceMock") === "1";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 探测真实后端；网络不可达或认证端点未就绪时降级 mock（仅开发期路径，联调后自动走 HTTP）。
- * 任意 HTTP 响应（含 401，未登录时）都说明后端在线；仅 fetch 网络异常才走 mock。
- */
+// Network failures must never silently switch learners to browser-owned records.
 export function getBackend(): Promise<BackendApi> {
-  cached ??= (async (): Promise<BackendApi> => {
-    if (isForceMock()) return new MockBackend();
-    try {
-      await fetch("/api/courses/");
-      // 契约§八联调前：后端在线但 /api/auth/login/ 未实现（404）→ 同样降级 mock。
-      // （用 POST 探测：DRF 路由缺失 → 404；已实现但未带 body → 400。OPTIONS 会被中间件统一 204，不可靠。）
-      const authProbe = await fetch("/api/auth/login/", { method: "POST" });
-      if (authProbe.status === 404) return new MockBackend();
-      return new HttpBackend();
-    } catch {
-      return new MockBackend();
-    }
-  })();
-  return cached;
+  return cached ??= Promise.resolve(new HttpBackend());
 }
-
-/** 登录/登出后重新探测（mock ↔ 真实后端切换）。 */
-export function resetBackend(): void {
-  cached = undefined;
-}
+export function resetBackend(): void { cached = undefined; }

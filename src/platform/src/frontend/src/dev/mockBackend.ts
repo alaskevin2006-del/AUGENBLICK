@@ -3,7 +3,6 @@ import type { EngineEvent } from "@znawca/adapter/ZnawcaActivity";
 import {
   ApiError,
   type AuthUser,
-  type BackendApi,
   type CourseSummary,
   type CreateSessionRequest,
   type CreateSessionResponse,
@@ -68,7 +67,7 @@ const MOCK_USERS: Readonly<Record<string, { password: string; user: AuthUser }>>
   user: { password: "user123", user: { username: "user", isDeveloper: false } },
 };
 
-export class MockBackend implements BackendApi {
+export class MockBackend  {
   async login(username: string, password: string): Promise<LoginResponse> {
     const entry = MOCK_USERS[username];
     if (!entry || entry.password !== password) {

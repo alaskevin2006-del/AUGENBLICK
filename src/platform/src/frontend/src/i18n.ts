@@ -11,6 +11,13 @@ export { textDirection };
 const STORAGE_KEY = "augenblick.ui.locale";
 
 const zhCN = {
+  "activity.error": "操作未确认，请重试。重试不会重复提交答案。",
+  "activity.finish": "提交结果",
+  "activity.skip": "跳过本次学习",
+  "activity.skipped": "本次学习已跳过",
+  "activity.pending": "正在保存…",
+  "activity.startError": "无法开始活动。已完成的测试不能重考；请返回课程列表重试。",
+
   "login.title": "登录 AUGENBLICK",
   "login.subtitle": "使用账号密码进入课程平台",
   "login.username": "用户名",
@@ -42,7 +49,7 @@ const zhCN = {
   "error.retry": "重试",
 
   "exit.title": "确定退出？",
-  "exit.body": "进度将保存，之后可以从课程卡片继续。",
+  "exit.body": "退出后，再次进入将从该活动开头重新开始。",
   "exit.stay": "继续答题",
   "exit.confirm": "退出",
 
@@ -71,6 +78,13 @@ export type ShellKey = keyof typeof zhCN;
 type ShellMessages = Record<ShellKey, string>;
 
 const en: ShellMessages = {
+  "activity.error": "The operation was not confirmed. Retry safely without submitting your answer twice.",
+  "activity.finish": "Submit results",
+  "activity.skip": "Skip this learning activity",
+  "activity.skipped": "Learning activity skipped",
+  "activity.pending": "Saving…",
+  "activity.startError": "Unable to start. Completed tests cannot be retaken. Return to courses and try again.",
+
   "login.title": "Log in to AUGENBLICK",
   "login.subtitle": "Sign in with your account to enter the course platform",
   "login.username": "Username",
@@ -102,7 +116,7 @@ const en: ShellMessages = {
   "error.retry": "Retry",
 
   "exit.title": "Leave the activity?",
-  "exit.body": "Progress is saved; you can resume from the course card.",
+  "exit.body": "When you return, this activity will restart from the beginning.",
   "exit.stay": "Keep answering",
   "exit.confirm": "Exit",
 
@@ -128,6 +142,13 @@ const en: ShellMessages = {
 };
 
 const pl: ShellMessages = {
+  "activity.error": "Nie potwierdzono operacji. Ponów bez ponownego zapisywania odpowiedzi.",
+  "activity.finish": "Prześlij wyniki",
+  "activity.skip": "Pomiń tę naukę",
+  "activity.skipped": "Nauka pominięta",
+  "activity.pending": "Zapisywanie…",
+  "activity.startError": "Nie można rozpocząć. Ukończonych testów nie można powtarzać. Wróć do kursów i spróbuj ponownie.",
+
   "login.title": "Zaloguj się do AUGENBLICK",
   "login.subtitle": "Zaloguj się kontem, aby wejść na platformę kursów",
   "login.username": "Nazwa użytkownika",
@@ -159,7 +180,7 @@ const pl: ShellMessages = {
   "error.retry": "Spróbuj ponownie",
 
   "exit.title": "Na pewno wyjść?",
-  "exit.body": "Postęp zostanie zapisany, można wrócić z karty kursu.",
+  "exit.body": "Po powrocie aktywność rozpocznie się od początku.",
   "exit.stay": "Odpowiadaj dalej",
   "exit.confirm": "Wyjdź",
 
@@ -185,6 +206,12 @@ const pl: ShellMessages = {
 };
 
 const ru: ShellMessages = {
+  "activity.error": "Операция не подтверждена. Повторите без повторной записи ответа.",
+  "activity.finish": "Отправить результаты",
+  "activity.skip": "Пропустить обучение",
+  "activity.skipped": "Обучение пропущено",
+  "activity.pending": "Сохранение…",
+  "activity.startError": "Не удалось начать. Завершённые тесты нельзя повторять. Вернитесь к курсам.",
   "login.title": "Вход в AUGENBLICK",
   "login.subtitle": "Войдите под своей учётной записью",
   "login.username": "Имя пользователя",
@@ -216,7 +243,7 @@ const ru: ShellMessages = {
   "error.retry": "Повторить",
 
   "exit.title": "Выйти из занятия?",
-  "exit.body": "Прогресс сохранён, продолжить можно с карточки курса.",
+  "exit.body": "При возвращении занятие начнётся сначала.",
   "exit.stay": "Продолжить отвечать",
   "exit.confirm": "Выйти",
 
@@ -242,6 +269,13 @@ const ru: ShellMessages = {
 };
 
 const ar: ShellMessages = {
+  "activity.error": "لم يتم تأكيد العملية. أعد المحاولة دون إرسال الإجابة مرتين.",
+  "activity.finish": "إرسال النتائج",
+  "activity.skip": "تخطي نشاط التعلم",
+  "activity.skipped": "تم تخطي نشاط التعلم",
+  "activity.pending": "جارٍ الحفظ…",
+  "activity.startError": "تعذر البدء. لا يمكن إعادة الاختبارات المكتملة. ارجع إلى المقررات وحاول مجددًا.",
+
   "login.title": "تسجيل الدخول إلى AUGENBLICK",
   "login.subtitle": "سجّل الدخول بحسابك للدخول إلى منصة الدورات",
   "login.username": "اسم المستخدم",
@@ -273,7 +307,7 @@ const ar: ShellMessages = {
   "error.retry": "إعادة المحاولة",
 
   "exit.title": "هل تريد الخروج؟",
-  "exit.body": "سيُحفظ التقدم ويمكنك المتابعة من بطاقة الدورة.",
+  "exit.body": "عند العودة، سيبدأ هذا النشاط من البداية.",
   "exit.stay": "متابعة الإجابة",
   "exit.confirm": "خروج",
 

@@ -1,5 +1,7 @@
 # Companion 引擎
 
+2026-10-19：已实现 ADR-0015 范围内的脚本、录音和本地声学对比试运行阶段。正式音素评分仍待语言模型与人工校准，测试模式暂不可用。使用方式和限制见 [STAGED-PRACTICE.md](docs/STAGED-PRACTICE.md)，可上传示例在 [templates/companion-example.zip](templates/companion-example.zip)。
+
 > 脚本驱动的语言训练引擎：读第三层 Excel（A–Q 列），逐行播放音频、显示文本、采集学习者语音做发音评估；末行执行完显示「Click to continue」按钮，等学习者按下后把控制权交还编排器。
 
 - 引擎：Companion

@@ -1,0 +1,12 @@
+.companion-question { width:100%; max-width:880px; margin:auto; }
+.companion-note {color:var(--muted,#a0b7ad);font-size:.85rem;line-height:1.5;}
+.companion-actions {display:flex;gap:1rem;margin:1rem 0;}
+.companion-question audio {width:100%;margin:.8rem 0;}
+.companion-segment {display:inline;padding:.1rem .2rem;border:0;background:none;color:inherit;border-radius:2px;white-space:pre-wrap;font:inherit;}
+.companion-segment:disabled {opacity:1;cursor:default;}
+.companion-segment:not(:disabled):hover {background:#244b3c;}
+.companion-transcript p {margin:.5rem 0;line-height:1.7;}
+.companion-diagnostics dl {display:flex;gap:1rem;flex-wrap:wrap;}
+.companion-diagnostics dd {margin:0;font-size:1.2rem;}
+.companion-diagnostics dt {font-size:.85rem;}
+.companion-diagnostics svg {width:100%;background:#071e16;}

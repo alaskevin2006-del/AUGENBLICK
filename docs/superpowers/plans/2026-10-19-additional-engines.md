@@ -25,35 +25,35 @@
 
 Files: backend core/engines/{registry,common}.py, engine_importer.py, views/runtime/selection/dev_views; frontend engines/EngineActivity.tsx and shared types/setup/replay.
 Consumes existing permissions and runtime; produces the interfaces specified by the design.
-- [ ] Write failing tests for registry dispatch, private redaction, manifest import/asset security and session roundtrip.
-- [ ] Implement interface adapters and retain Znawca fallback.
-- [ ] Run backend suite and frontend build/tests; commit common integration.
+- [x] Write failing tests for registry dispatch, private redaction, manifest import/asset security and session roundtrip.
+- [x] Implement interface adapters and retain Znawca fallback.
+- [x] Run backend suite and frontend build/tests; commit common integration.
 
 ### Task 2: Anvil
 
 Files: core/engines/anvil.py, tests_anvil.py, frontend engines/AnvilQuestion.tsx, src/anvil documentation/templates.
 Consumes compile/score/component contract from Task 1.
-- [ ] Write and run failing tests for all nine types, correct/incorrect answers, malformed answers and import fixtures.
-- [ ] Implement explicit workbook and JSON compilation, legacy migration, grouped media, cloze/matching/persistent set.
-- [ ] Verify tests, source ZIP roundtrip, keyboard UI and read-only replay; commit.
+- [x] Write and run failing tests for all nine types, correct/incorrect answers, malformed answers and import fixtures.
+- [x] Implement explicit workbook and JSON compilation, legacy migration, grouped media, cloze/matching/persistent set.
+- [x] Verify tests, source ZIP roundtrip, keyboard UI and read-only replay; commit.
 
 ### Task 3: Ekspert and Sokole Oko
 
 Files: core/engines/{ekspert,sokole}.py, corresponding tests, frontend question components, source templates.
-- [ ] Write and run failing axis partial-score, mask hit/miss/overlap/duplicate/private-leak and import tests.
-- [ ] Implement compilers/scorers, course-scoped atlas, incremental point state and accessible question UI.
-- [ ] Verify live session and history roundtrips for both engines; commit.
+- [x] Write and run failing axis partial-score, mask hit/miss/overlap/duplicate/private-leak and import tests.
+- [x] Implement compilers/scorers, course-scoped atlas, incremental point state and accessible question UI.
+- [x] Verify live session and history roundtrips for both engines; commit.
 
 ### Task 4: Companion
 
 Files: core/engines/companion.py, local audio analyzer, tests, frontend CompanionQuestion.tsx, source templates.
-- [ ] Write failing script/checkpoint/recording validation and deterministic acoustic diagnostics tests.
-- [ ] Implement ordered script playback, bounded recording, ephemeral local analysis and explicit uncalibrated status; block formal voice examination.
-- [ ] Verify permission denial/cancel cleanup, silence/mismatch, source ZIP and learning/history; commit.
+- [x] Write failing script/checkpoint/recording validation and deterministic acoustic diagnostics tests.
+- [x] Implement ordered script playback, bounded recording, ephemeral local analysis and explicit uncalibrated status; block formal voice examination.
+- [x] Verify permission denial/cancel cleanup, silence/mismatch, source ZIP and learning/history; commit.
 
 ### Task 5: Release
 
-- [ ] Full backend/PostgreSQL and frontend tests/build; independent review; fix material findings with regression tests.
-- [ ] Generate author templates and public acceptance fixtures; verify all completed engines and existing Znawca.
-- [ ] Back up and deploy AUGENBLICK only, verify public functionality, remove disposable fixtures.
-- [ ] Push code and document exact supported scope, remaining voice calibration requirement and rollback version.
+- [x] Full backend/PostgreSQL and frontend tests/build; independent review; fix material findings with regression tests.
+- [x] Generate author templates and public acceptance fixtures; verify all completed engines and existing Znawca.
+- [x] Back up and deploy AUGENBLICK only, verify public functionality, remove disposable fixtures.
+- [x] Push code and document exact supported scope, remaining voice calibration requirement and rollback version.

@@ -36,6 +36,7 @@
 
 ## 在线试点（2026-10-19）
 
-- [打开 AUGENBLICK](https://124.221.230.69:18443/)：当前为 Znawca 学习/测试试点，包含独立开发者页、草稿预览、发布/下架、选课/退课、共同课程设置与分批练习、历史及困难内容，保留五种界面语言；完整平台及其他引擎仍在后续范围。
-- [最新交付：课程内导航与记录](docs/releases/2026-10-19-course-navigation.md) · [退课与困难内容](docs/releases/2026-10-19-course-records.md) · [课程设置与下架](docs/releases/2026-10-19-course-setup.md) · [角色页面及上传修复](docs/releases/2026-10-19-role-pages.md) · [首次上线记录](docs/releases/2026-10-19-pilot.md) · [部署与回滚](src/platform/deploy/README.md) · [全局进度](docs/进度.md)。
+- [打开 AUGENBLICK](https://124.221.230.69:18443/)：Znawca、Anvil、Ekspert、Sokole Oko 已接入学习/测试试点；Companion 提供脚本、录音和本地声学练习，正式发音考试等待模型与语料校准。保留独立开发者页、草稿预览、发布/下架、选课/退课、分批练习、课程内历史及困难内容和五种界面语言。完整平台仍在后续范围。
+- 开发者页「课程模板」提供四种新增引擎的可上传 ZIP；模板仅为功能示例，不是专业教学语料。修改模板后上传为草稿即可试学。
+- [最新交付：新增引擎分阶段接入](docs/releases/2026-10-19-additional-engines.md) · [课程内导航与记录](docs/releases/2026-10-19-course-navigation.md) · [退课与困难内容](docs/releases/2026-10-19-course-records.md) · [课程设置与下架](docs/releases/2026-10-19-course-setup.md) · [角色页面及上传修复](docs/releases/2026-10-19-role-pages.md) · [首次上线记录](docs/releases/2026-10-19-pilot.md) · [部署与回滚](src/platform/deploy/README.md) · [全局进度](docs/进度.md)。
 - 开发者和普通用户账号凭证仅在本机 `AUGENBLICK-access.local` 保存，不进入仓库。

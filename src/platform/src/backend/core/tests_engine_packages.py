@@ -22,6 +22,17 @@ class EnginePackageTests(TestCase):
         override=override_settings(MEDIA_ROOT=self.temp.name);override.enable();self.addCleanup(override.disable)
         self.client=APIClient();self.client.force_authenticate(get_user_model().objects.create_user('engine-author',is_staff=True))
 
+    def test_downloadable_author_templates_import_as_drafts(self):
+        for engine in ['anvil','ekspert','sokole-oko','companion']:
+            with self.subTest(engine=engine):
+                archive=(Path(__file__).parent/'fixtures'/f'{engine}.zip').read_bytes()
+                result=self.client.post('/api/dev/courses/upload/',{'file':SimpleUploadedFile(f'{engine}.zip',archive)},format='multipart')
+                self.assertEqual(result.status_code,200,result.data)
+                course=CourseVersion.objects.get(pk=result.data['imported'][0]['courseVersionId'])
+                self.assertEqual(course.engine,engine)
+                self.assertEqual(course.status,'draft')
+                self.assertTrue(course.payload['questions'])
+
     def upload(self,engine):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

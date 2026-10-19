@@ -46,6 +46,19 @@ const course = {
 };
 const button = (view, text) =>
   view.root.findAllByType("button").find((b) => b.children.join("") === text);
+test('all implemented engines can be entered from developer and enrolled courses; reserved engines remain disabled',async()=>{
+  for(const engine of ['znawca','anvil','ekspert','sokole-oko','companion','direct']){
+    for(const developer of [true,false]){
+      let view,entered;
+      const props=developer?{isDeveloper:true,onPreview:id=>entered=id,onUploaded(){},onPublish(){},onUnpublish(){}}:{view:'my-courses',onEnter:id=>entered=id,onEnroll(){}};
+      await act(async()=>{view=Renderer.create(React.createElement(developer?mod.DeveloperPage:mod.CourseListPage,{...props,courses:[{...course,engine,isEnrolled:true}]}));});
+      const enter=button(view,'Enter course');
+      assert.equal(Boolean(enter.props.disabled),engine==='direct',`${engine}: ${developer?'developer':'student'}`);
+      if(engine!=='direct'){act(()=>enter.props.onClick());assert.equal(entered,course.courseVersionId);}
+      view.unmount();
+    }
+  }
+});
 test("role routes constrain refresh and navigation", () => {
   assert.equal(mod.roleRoute({ isDeveloper: true }, "#/courses"), "developer");
   assert.equal(mod.roleRoute({ isDeveloper: false }, "#/developer"), "courses");

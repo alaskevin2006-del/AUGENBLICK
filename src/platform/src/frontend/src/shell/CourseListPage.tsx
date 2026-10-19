@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {supportedEngines} from '../engines/registry';
 import type { CourseSummary } from "../orchestrator/types";
 import { useT } from "../i18n";
 export function CourseListPage({
@@ -49,7 +50,7 @@ export function CourseListPage({
                         )}
                       </button>
                     ) : (
-                      <button className="metal-button" disabled={disabled || course.engine !== "znawca"} onClick={() => onEnter(course.courseVersionId)}>{t("courses.enter")}</button>
+                      <button className="metal-button" disabled={disabled || !supportedEngines.has(course.engine)} onClick={() => onEnter(course.courseVersionId)}>{t("courses.enter")}</button>
                     )}
                     {view === "my-courses" && onUnenroll && <button className="metal-button" disabled={disabled} onClick={()=>setWithdraw(course)}>{t("courses.withdraw")}</button>}
                   </div>

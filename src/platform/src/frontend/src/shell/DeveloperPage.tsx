@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {AuthorTemplates} from '../engines/AuthorTemplates';
+import {supportedEngines} from '../engines/registry';
 import {
   ApiError,
   type CourseSummary,
@@ -190,7 +191,7 @@ export function DeveloperPage({
                     </td>
                     <td>
                       <div className="course-actions">
-                        <button className="metal-button" disabled={busy || disabled || course.engine !== "znawca"} onClick={() => onPreview(course.courseVersionId)}>{t("courses.enter")}</button>
+                        <button className="metal-button" disabled={busy || disabled || !supportedEngines.has(course.engine)} onClick={() => onPreview(course.courseVersionId)}>{t("courses.enter")}</button>
                         {course.status === "published" && <button className="metal-button" disabled={busy || disabled} onClick={() => setWithdraw(course.courseVersionId)}>{t("dev.unpublish")}</button>}
                         {course.status !== "published" && (
                           <button
